@@ -41,7 +41,7 @@ class NewMark:
             u_star = u[:, j] + self.tau * du[:,j] + (0.5 - self.beta) * self.tau ** 2 * ddu[:, j]
             du_star = du[:, j] + (1 - self.gamma) * ddu[:,j] * self.tau
 
-            rhs = f[:, j+1] - M @ ddu[:, -1] - S @ u_star
+            rhs = f[:, j+1] - S @ u_star
             ddu[:, j + 1] = np.linalg.solve(S * self.beta * self.tau ** 2 + M, rhs)
             u[:, j + 1] = u_star + self.beta * ddu[:, j + 1] * self.tau ** 2
             du[:, j + 1] = du_star + self.gamma * ddu[:, j + 1] * self.tau
