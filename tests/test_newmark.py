@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from src.utils import NewMark
+from utils.newmark import NewMark
 
 
 def test_newmark():
