@@ -1,6 +1,6 @@
 import numpy as np
 from matplotlib import pyplot as plt
-from utils.local_matrix import LocalMatrix
+from utils.local_matrix import LocalElement
 
 
 class Beam:
@@ -21,8 +21,7 @@ class Beam:
         self.assemble_matrices()
 
     def local_matrices(self):
-        LocMat = LocalMatrix()
-        self.local_S, self.local_M = LocMat.evaluate(self.E, self.I, self.rho, self.element_len)
+        self.local_S, self.local_M = LocalElement.evaluate(self.E, self.I, self.rho, self.element_len)
 
     def assemble_matrices(self):
         self.local_matrices()
