@@ -12,7 +12,7 @@ class NewMark:
         self.tau = tau
         self.num_steps = num_steps
 
-    def solve(self, M: np.ndarray, S: np.ndarray, f: np.ndarray, x: np.ndarray,dx: np.ndarray, ddx: np.ndarray):
+    def solve(self, M: np.ndarray, S: np.ndarray, f: np.ndarray, x: np.ndarray, dx: np.ndarray, ddx: np.ndarray):
         '''
         M: the Mass Matrix
         S: the Stiffness Matrix
@@ -32,16 +32,19 @@ class NewMark:
         u = np.zeros([num_dofs, self.num_steps])
         du = np.zeros([num_dofs, self.num_steps])
         ddu = np.zeros([num_dofs, self.num_steps])
+        is_f_dynamic = len(f.shape) == 2
 
         u[:, 0] = x
         du[:, 0] = dx
         ddu[:, 0] = ddx
 
         for j in range(self.num_steps - 1):
-            u_star = u[:, j] + self.tau * du[:,j] + (0.5 - self.beta) * self.tau ** 2 * ddu[:, j]
-            du_star = du[:, j] + (1 - self.gamma) * ddu[:,j] * self.tau
-
-            rhs = f[:, j+1] - S @ u_star
+            u_star = u[:, j] + self.tau * du[:, j] + (0.5 - self.beta) * self.tau ** 2 * ddu[:, j]
+            du_star = du[:, j] + (1 - self.gamma) * ddu[:, j] * self.tau
+            if is_f_dynamic:
+                rhs = f[:, j+1] - S @ u_star
+            else:
+                rhs = f - S @ u_star
             ddu[:, j + 1] = np.linalg.solve(S * self.beta * self.tau ** 2 + M, rhs)
             u[:, j + 1] = u_star + self.beta * ddu[:, j + 1] * self.tau ** 2
             du[:, j + 1] = du_star + self.gamma * ddu[:, j + 1] * self.tau
