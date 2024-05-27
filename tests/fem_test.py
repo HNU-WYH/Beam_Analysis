@@ -1,7 +1,7 @@
 from src.beam import Beam
 from src.fem import FEM
 import matplotlib.pyplot as plt
-from utils.config import LoadType, ConstraintType, SolvType
+from src.utils import LoadType, ConstraintType, SolvType
 
 
 def test_fem():
@@ -20,8 +20,8 @@ def test_fem():
     fem.apply_force((5, 100), LoadType.F)
 
     # Add constraints: displacement at node 0 is 0, rotation at node 4 is 0
-    fem.add_constraint(0, 0, ConstraintType.displacement)
-    fem.add_constraint(0, 0, ConstraintType.rotation)
+    fem.add_constraint(0, 0, ConstraintType.DISPLACEMENT)
+    fem.add_constraint(0, 0, ConstraintType.ROTATION)
 
     # Solve the system
     fem.solv()
@@ -30,7 +30,7 @@ def test_fem():
     plt.plot(fem.stsol[0:2*(num_elements+1):2])
     plt.show()
 
-    fem.solv(tau=0.1, num_steps=10000, soltype=SolvType.dynamic)
+    fem.solv(tau=0.1, num_steps=10000, soltype=SolvType.DYNAMIC)
     plt.plot(fem.dysol[0:2*(num_elements+1):2,-1])
     plt.show()
 

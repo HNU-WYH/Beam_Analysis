@@ -1,8 +1,8 @@
 import numpy as np
-from src.beam import Beam
-from utils.config import LoadType, ConstraintType, SolvType
-from utils.local_matrix import LocalElement
-from utils.newmark import NewMark
+from beam import Beam
+from src.utils import LoadType, ConstraintType, SolvType
+from src.utils import LocalElement
+from src.utils import NewMark
 
 
 class FEM:
@@ -16,7 +16,7 @@ class FEM:
         self.q = np.zeros(2 * beam.num_nodes)
 
     def apply_force(self, load, load_type):
-        if load_type == LoadType.p:
+        if load_type == LoadType.q:
             for idx, xstart in enumerate(self.beam.nodes[0:-1]):
                 self.q[2 * idx:2 * idx + 4] += LocalElement.equal_force(
                     load,
@@ -79,20 +79,20 @@ class FEM:
             constraint_idx  = original_size+i
             self.new_q[constraint_idx] = value
 
-            if constraint_type == ConstraintType.rotation:
+            if constraint_type == ConstraintType.ROTATION:
                 self.S[constraint_idx, 2 * node + 1] = 1
                 self.S[2 * node + 1, constraint_idx] = 1
-            elif constraint_type == ConstraintType.displacement:
+            elif constraint_type == ConstraintType.DISPLACEMENT:
                 self.S[constraint_idx, 2 * node] = 1
                 self.S[2 * node, constraint_idx] = 1
             else:
                 Warning("wrong type of constraint", constraint_type)
 
-    def solv(self, num_steps=None, tau=None, soltype=SolvType.static, beta=0.25, gamma=0.5):
+    def solv(self, num_steps=None, tau=None, soltype=SolvType.STATIC, beta=0.25, gamma=0.5):
         self.__apply_constraint()
-        if soltype == SolvType.static:
+        if soltype == SolvType.STATIC:
             self.stsol = np.linalg.solve(self.S, self.new_q)
-        elif soltype == SolvType.dynamic:
+        elif soltype == SolvType.DYNAMIC:
             newmark_solver = NewMark(tau, num_steps, beta, gamma)
             init_condis = np.zeros(self.new_q.shape)
             self.dysol, _, _ = newmark_solver.solve(self.M, self.S, self.new_q, init_condis, init_condis, init_condis)

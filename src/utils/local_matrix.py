@@ -1,7 +1,7 @@
 import sympy as sp
 import numpy as np
 from scipy.integrate import quad
-from utils.config import LoadType
+from config import LoadType
 
 
 class LocalElement:
@@ -81,7 +81,7 @@ class LocalElement:
         """
         Pe = np.zeros(4)
         bas_func, bas_func_1st = LocalElement._loc_basis_func()
-        if load_type == LoadType.p:
+        if load_type == LoadType.q:
             # here load(x) is a function in global coordinates
             def p_local(x_loc):
                 x = x_loc +xstart # convert local coordinate into global obe

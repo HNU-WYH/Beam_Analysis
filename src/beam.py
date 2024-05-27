@@ -1,5 +1,5 @@
 import numpy as np
-from utils.local_matrix import LocalElement
+from src.utils import LocalElement
 
 
 class Beam:
