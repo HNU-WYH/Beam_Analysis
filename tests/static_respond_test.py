@@ -1,15 +1,13 @@
-from src.beam import Beam
-from src.fem import FEM
 import matplotlib.pyplot as plt
-from src.utils import LoadType, ConstraintType, SolvType
+from src.beam import Beam
+from src.fem import FEM, LoadType, ConstraintType, SolvType
 
 
-def test_fem():
+def test_static_fem():
     # Initialize a simple beam with 5 nodes and length 10
     length = 5.0
-    num_elements = 5
-    E, I, rho = 1, 1, 1
-
+    num_elements = 50
+    E, I, rho = 210 * 10 ** 9, 1 * 10 ** (-6), 7800
 
     # Initialize the beam
     beam = Beam(length, E, rho, I, num_elements)
@@ -25,14 +23,17 @@ def test_fem():
 
     # Solve the system
     fem.solv()
+    stsol = fem.stsol[0:2 * (num_elements + 1):2]
 
-    # Output the solution
-    plt.plot(fem.stsol[0:2*(num_elements+1):2])
+    # Plot the static solution
+    plt.plot(stsol, label='Static Solution')
+    plt.xlabel('Node')
+    plt.ylabel('Displacement')
+    plt.title('Static Solution')
+    plt.legend()
     plt.show()
 
-    fem.solv(tau=0.1, num_steps=10000, soltype=SolvType.DYNAMIC)
-    plt.plot(fem.dysol[0:2*(num_elements+1):2,-1])
-    plt.show()
 
-# Run the test
-test_fem()
+if __name__ == "__main__":
+    # Run the test
+    test_static_fem()

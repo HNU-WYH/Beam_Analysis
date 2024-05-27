@@ -1,11 +1,14 @@
 import numpy as np
+import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from src.beam import Beam
 from src.fem import FEM, LoadType, ConstraintType, SolvType
 
 
-def test_fem():
+def test_dynamic_fem():
+    matplotlib.use("WebAgg")
+
     # Initialize a simple beam with 5 nodes and length 10
     length = 5.0
     num_elements = 50
@@ -21,8 +24,8 @@ def test_fem():
     fem.apply_force((5, 50), LoadType.F)
 
     # Add constraints: displacement at node 0 is 0, rotation at node 4 is 0
-    fem.add_constraint(0, 0, ConstraintType.displacement)
-    fem.add_constraint(0, 0, ConstraintType.rotation)
+    fem.add_constraint(0, 0, ConstraintType.DISPLACEMENT)
+    fem.add_constraint(0, 0, ConstraintType.ROTATION)
 
     # Solve the static system
     fem.solv()
@@ -31,30 +34,21 @@ def test_fem():
     stsol = fem.stsol[0:2 * (num_elements + 1):2]
 
     # Solve the dynamic system
-    fem.solv(tau=0.1, num_steps=200, soltype=SolvType.dynamic)
+    fem.solv(tau=0.1, num_steps=200, soltype=SolvType.DYNAMIC)
 
     # Get the dynamic solution
     dysol = fem.dysol[0:2 * (num_elements + 1):2, :]
 
-    # # Plot the static solution
-    plt.switch_backend('WebAgg')
-    # plt.plot(stsol, label='Static Solution')
-    # plt.xlabel('Node')
-    # plt.ylabel('Displacement')
-    # plt.title('Static Solution')
-    # plt.legend()
-    # # plt.show()
-
     # Create a figure and axis for the animation
     fig, ax = plt.subplots()
     line, = ax.plot([], [], 'r-', label='Dynamic Solution')
-    static_line, = ax.plot(stsol, 'b-', label='Static Solution')
+    ax.plot(stsol, 'b-', label='Static Solution')
     ax.set_xlim(0, len(stsol) - 1)
     ax.set_ylim(np.min(dysol), np.max(dysol))
     ax.set_xlabel('Node')
     ax.set_ylabel('Displacement')
     ax.set_title('Dynamic Solution Over Time')
-    ax.legend()
+    ax.legend(loc = "upper left")
 
     # Update function for animation
     def update(frame):
@@ -71,5 +65,6 @@ def test_fem():
     plt.show()
 
 
-# Run the test
-test_fem()
+if __name__ == "__main__":
+    # Run the test
+    test_dynamic_fem()

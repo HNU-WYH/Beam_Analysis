@@ -2,21 +2,8 @@ from src.beam import Beam
 from src.fem import FEM
 from src.utils.local_matrix import LocalElement
 from src.utils.local_matrix import LoadType
+from config import uniform_load_function, partial_uniform_load_function, triangular_load_function
 
-
-def uniform_load_function(x):
-    return 1.0  # Constant distributed load of 1000 N/m
-
-
-def triangular_load_function(x):
-    return x
-
-
-def partial_uniform_load_function(x):
-    if x <= 0.5:
-        return 1
-    else:
-        return 0
 
 def test_equal_force():
     # Define beam parameters
@@ -30,13 +17,16 @@ def test_equal_force():
     # Initialize FEM
     fem = FEM(beam)
 
-    # Define a distributed load function
-    fem.apply_force(uniform_load_function, LoadType.q)
-    print("\nEquivalent nodal forces for uniform load\n",fem.q)
+    print("\nEquivalent nodal forces for triangular distributed load\n",
+          LocalElement.equal_force(uniform_load_function, LoadType.q, 0, beam.element_len))
     print("Equivalent nodal forces for triangular distributed load\n",
           LocalElement.equal_force(triangular_load_function, LoadType.q, 0, beam.element_len))
     print("Equivalent nodal forces for partial uniform load\n",
           LocalElement.equal_force(partial_uniform_load_function, LoadType.q, 0, beam.element_len))
+
+    fem.apply_force(uniform_load_function, LoadType.q)
+    print("\nGlobal nodal forces for uniform load\n", fem.q)
+
 
 if __name__ == '__main__':
     test_equal_force()

@@ -1,8 +1,8 @@
 import numpy as np
-from beam import Beam
-from src.utils import LoadType, ConstraintType, SolvType
-from src.utils import LocalElement
-from src.utils import NewMark
+from src.beam import Beam
+from config import LoadType, ConstraintType, SolvType
+from src.utils.local_matrix import LocalElement
+from src.utils.newmark import NewMark
 
 
 class FEM:
