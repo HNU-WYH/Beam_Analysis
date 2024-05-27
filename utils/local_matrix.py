@@ -1,13 +1,7 @@
 import sympy as sp
 import numpy as np
-from enum import Enum
 from scipy.integrate import quad
-
-
-class LoadType(Enum):
-    p = "distributed force"
-    F = "point force"
-    M = "moment"
+from utils.config import LoadType
 
 
 class LocalElement:

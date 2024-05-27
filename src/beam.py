@@ -1,5 +1,4 @@
 import numpy as np
-from matplotlib import pyplot as plt
 from utils.local_matrix import LocalElement
 
 
