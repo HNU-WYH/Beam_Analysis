@@ -7,7 +7,7 @@ from src.fem import FEM, LoadType, ConstraintType, SolvType
 
 
 def test_dynamic_fem():
-    matplotlib.use("WebAgg")
+    matplotlib.use("WebAgg", force=True)
 
     # Initialize a simple beam with 5 nodes and length 10
     length = 5.0
@@ -59,7 +59,7 @@ def test_dynamic_fem():
     ani = animation.FuncAnimation(fig, update, frames=dysol.shape[1], blit=True)
 
     # Save the animation as a GIF
-    # ani.save(r'.\output\dynamic_solution.gif', writer='imagemagick', fps=30)
+    # ani.save(r'..\output\dynamic_solution.gif', writer='imagemagick', fps=30)
 
     # Display the animation
     plt.show()
