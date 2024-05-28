@@ -2,6 +2,10 @@ import numpy as np
 import sympy as sp
 import matplotlib.pyplot as plt
 
+"""
+BEAM PARAMETERS
+"""
+
 # Parameters
 L = 10 # Length of the beam
 n = 25  # Number of elements
@@ -20,6 +24,10 @@ h = L / n  # Length of each element
 elements = []
 for i in range(n):
     elements.append([i, i + 1])  # Node indices of each element, [start, end]
+
+"""
+STIFNESS AND MASS MATRICES (Local and Global)
+"""
 
 # LOCAL MATRICES
 def local_matrices(E_val, I_val, rho_val, h_val):
@@ -83,13 +91,12 @@ global_S, global_M = global_matrices()
 #print(np.round(global_S, 2))
 
 """
-FORCE APPLIED AND BOUNDARY CONDITIONS
+FORCE APPLIED
 
 """
 # FORCE vector. Uniform load
 f = np.zeros((2 * n_nodes, 1))
 q = 10  # Newtons ------EDIT
-beamtype = "cantilever"  # "cantilever" or "simply_supported" -----EDIT
 
 # Compute the force exerted by the force density on each element
 force_per_element = q * h / 2
@@ -99,6 +106,11 @@ for i in range(n):
     ielem = 2 * i  # Starting position for the current element
     f[ielem] += force_per_element  # Add force at the first node (start) of the element
     f[ielem + 2] += force_per_element  # Add force at the second node (end) of the element
+
+"""
+BOUNDARY CONDITIONS DEPENDING ON TYPE OF BEAM
+"""
+beamtype = "cantilever"  # "cantilever" or "simply_supported" -----EDIT
 
 # Apply boundary conditions and solve for displacements
 if beamtype == "simply_supported":
@@ -147,7 +159,7 @@ else:
 plt.figure(figsize=(8, 6))
 plt.plot(x_nodes, dx, label='Displacement', marker='o')
 plt.xlabel('Position along beam / Node')
-plt.ylabel('Displacement (m)')
+plt.ylabel('Displacement')
 plt.title(f'{beamtype} Beam, constant load = {q} N/m')
 plt.legend()
 plt.grid()
