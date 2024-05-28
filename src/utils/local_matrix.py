@@ -23,6 +23,10 @@ class LocalElement:
         ]
         return bas_func, bas_func_1st
 
+    def __global_basis_func(idx, domain, num_element):
+
+        return
+
     @staticmethod
     def _init_local_matrix():
         # symbols
@@ -103,10 +107,75 @@ class LocalElement:
                 Pe[i] = m * N(pos-xstart, h)
         return Pe
 
+    @staticmethod
+    def app_func(x, u, domain, num_elements):
+        """
+        approximate a function f with basis function phi_i and coordinates u_i such that
+        $$
+        f = \sum u_iphi_i
+        $$
+
+        :param x: the input
+        :param u: coefficient of basis function
+        :param domain: [start,end]
+        :param num_elements:
+        :return f: the approximate function with basis functions
+        """
+        start, end = domain
+        element_len = (end - start) / num_elements
+        node_list = np.linspace(start, end, num_elements + 1)
+        bas_func, _ = LocalElement._loc_basis_func()
+
+        start_idx = int(x/element_len)
+        end_idx = start_idx + 1
+        start = node_list[start_idx]
+
+        f_val = 0
+        f_val += u[start_idx*2] * bas_func[0](x - start, element_len)
+        f_val += u[start_idx*2 + 1] * bas_func[1](x - start, element_len)
+
+        if end_idx < len(node_list):
+            f_val += u[end_idx*2] * bas_func[2](x - start, element_len)
+            f_val += u[end_idx*2 +1] * bas_func[3](x - start, element_len)
+
+        return f_val
+
+
+def approximation_test():
+    import matplotlib.pyplot as plt
+    num_elements = 5
+    plot_precision = 100
+    domain = [0, 2 * np.pi]
+    x_values = np.linspace(domain[0], domain[1], plot_precision)
+    node_list = np.linspace(domain[0], domain[1], num_elements + 1)
+
+    # Create u as coefficients of the basis functions to approximate sin(x)
+    u = np.zeros(2 * len(node_list))
+    u[0::2] = np.sin(node_list)  # coefficients for phi_2i-1
+    u[1::2] = np.cos(node_list)  # coefficients for phi_2i
+
+    # Get the approximate function
+    approx_values = np.array([LocalElement.app_func(x, u, domain, num_elements) for x in x_values])
+
+    # Original function
+    original_function = np.sin(x_values)
+    x = np.linspace(domain[0], domain[1], 200)
+    sin_x = np.sin(x)
+
+    # Plot the original function and the approximation
+    plt.plot(x, sin_x, label='Original sin(x)')
+    plt.plot(x_values, approx_values, label='Approximation', linestyle='--')
+    plt.legend()
+    plt.xlabel('x')
+    plt.ylabel('f(x)')
+    plt.title('Approximation of sin(x) using basis functions')
+    plt.show()
+
 
 if __name__ == "__main__":
-    LocMat = LocalElement()
-    print("the Stiffness Matrix:")
-    print(np.array(LocMat.S))
-    print("\nthe Mass Matrix:")
-    print(np.array(LocMat.M))
+    # LocMat = LocalElement()
+    # print("the Stiffness Matrix:")
+    # print(np.array(LocMat.S))
+    # print("\nthe Mass Matrix:")
+    # print(np.array(LocMat.M))
+    approximation_test()
