@@ -14,7 +14,7 @@ class LocalElement:
             lambda x, h: h * (x / h) ** 2 * (x / h - 1)
         ]
 
-        # second derivative of basis function
+        # first derivative of basis function
         bas_func_1st = [
             lambda x, h: -6*x/h**2 + 6*x**2/h**3,
             lambda x, h: (x/h-1)**2 + 2*(x/h)*(x/h-1),
