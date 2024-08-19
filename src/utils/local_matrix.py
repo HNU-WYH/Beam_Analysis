@@ -5,30 +5,58 @@ from config import LoadType
 
 
 class LocalElement:
+    """
+    Properties & Calculation in an local element [node_i,node_{i+1}]
+    """
     @staticmethod
     def _loc_basis_func():
+        """
+        In the finite element methods for beams, each node typically has two basis functions:
+            - φ1: representing the displacement
+            - φ2: representing the slope, namely the derivative of displacement
+
+        For a given node j:
+            - φ1(node_j) = δ_{ij}.
+
+            - φ2'(node_j) = δ_{ij}.
+
+            - where δ_{ij} equals to 1 if i = j, otherwise 0.
+
+        :return:
+            bas_func (list): A list of basis functions for node_i & node_{i+1}.
+            bas_func_1st (list): A list of the first derivatives of the basis functions
+        """
         bas_func = [
-            lambda x, h: 1 - 3 * (x / h) ** 2 + 2 * (x / h) ** 3,
-            lambda x, h: h * (x / h) * (x / h - 1) ** 2,
-            lambda x, h: 3 * (x / h) ** 2 - 2 * (x / h) ** 3,
-            lambda x, h: h * (x / h) ** 2 * (x / h - 1)
+            lambda x, h: 1 - 3 * (x / h) ** 2 + 2 * (x / h) ** 3, # First basis function (φ1) of node_i
+            lambda x, h: h * (x / h) * (x / h - 1) ** 2,          # Second basis function (φ2) of node_i
+            lambda x, h: 3 * (x / h) ** 2 - 2 * (x / h) ** 3,     # First basis function of node_{i+1}
+            lambda x, h: h * (x / h) ** 2 * (x / h - 1)           # Second basis function of node_{i+1}
         ]
 
         # first derivative of basis function
         bas_func_1st = [
-            lambda x, h: -6*x/h**2 + 6*x**2/h**3,
-            lambda x, h: (x/h-1)**2 + 2*(x/h)*(x/h-1),
-            lambda x, h: 6*x/h**2 - 6*x**2/h**3,
-            lambda x, h: 2*(x/h)*(x/h-1) + x**2/h**2
+            lambda x, h: -6*x/h**2 + 6*x**2/h**3,                 # First derivative of First basis function (φ1') of node_i
+            lambda x, h: (x/h-1)**2 + 2*(x/h)*(x/h-1),            # First derivative of Second basis function (φ2') of node_{i+1}
+            lambda x, h: 6*x/h**2 - 6*x**2/h**3,                  # First derivative of First basis function of node_i
+            lambda x, h: 2*(x/h)*(x/h-1) + x**2/h**2              # First derivative of Second basis function of node_{i+1}
         ]
+
         return bas_func, bas_func_1st
-
-    def __global_basis_func(idx, domain, num_element):
-
-        return
 
     @staticmethod
     def _init_local_matrix():
+        """
+        Initializes the local stiffness and mass matrices for a local one-dimensional element in a beam.
+
+        The stiffness matrix (S) and mass matrix (M) are derived using the basis functions and
+        their second derivatives.
+
+        The returned matrices are symbolic and will be numerically evaluated later.
+
+        details & induction of mass & stiffness matrices can be found in script1_bending_and_fem.pdf
+
+        :return: S (sp.Matrix), M (sp.Matrix): The symbolic stiffness matrix & mass matrix.
+        """
         # symbols
         x, E, I, h, rho = sp.symbols('x E I h rho')
 
@@ -56,6 +84,18 @@ class LocalElement:
 
     @staticmethod
     def evaluate(E_val, I_val, rho_val, h_val):
+        """
+        Numerically evaluates the local stiffness and mass matrices using the provided material and geometric properties.
+
+        Parameters:
+            E_val (float): Young's modulus.
+            I_val (float): Moment of inertia.
+            rho_val (float): Density.
+            h_val (float): Length of the element.
+
+        Returns:
+            S_num (np.ndarray), M_num (np.ndarray): The numerical stiffness matrix & mass matrix.
+        """
         S, M = LocalElement._init_local_matrix()
         S_func = sp.lambdify((sp.symbols('h E I')), S, "numpy")
         M_func = sp.lambdify((sp.symbols('h rho')), M, "numpy")
@@ -67,68 +107,76 @@ class LocalElement:
     @staticmethod
     def equal_force(load, load_type: LoadType, xstart, h):
         """
-        Compute the equivalent node force based on the equivalent virtual work principle.
+        When external load is not on the node of elements, an equivalent nodal forces is required  for further computation
+
+        This method converts distributed loads, point forces, and moments into equivalent nodal forces,
+        using the equivalent virtual work principle, and then facilitate the following finite element method.
 
         Parameters:
-        force : tuple or function
-            The tuple for local position and magnitude of the external action (including force and moment for point loads) or a function defining the distributed load in global coordinate.
-        force_type : ForceType
-            The type of external force ('point' or 'distributed').
-        xstart : float
-            The start position of the local element in global coordinates.
-        h : float
-            The length of the local element.
+            load (tuple or function): The load applied to the element. Can be a function (for distributed load) or a tuple (for point load or moment).
+            load_type (LoadType): The type of load (e.g., distributed, point force, moment).
+            xstart (float): The start position of the element in global coordinates.
+            h (float): The length of a local element.
 
         Returns:
-        np.ndarray
-            The equivalent node force vector.
+            Pe (np.ndarray): The numerical equivalent nodal force vector.
         """
         Pe = np.zeros(4)
         bas_func, bas_func_1st = LocalElement._loc_basis_func()
+
+        # For arbitrary distributed load
         if load_type == LoadType.q:
-            # here load(x) is a function in global coordinates
+            # convert global load function load(x) into local one
+            # p_local is the distributed load in the current local element
             def p_local(x_loc):
-                x = x_loc +xstart # convert local coordinate into global obe
+                x = x_loc +xstart
                 return load(x)
 
             for i, N in enumerate(bas_func):
-                Pe[i], _ = quad(lambda x: p_local(x) * N(x, h), 0, h)
+                # integrate the product of basis function and local distributed load from 0 to h.
+                product = lambda x: p_local(x) * N(x, h)
+                Pe[i], _ = quad(product, 0, h)
 
+        # For arbitrary point load
         elif load_type == LoadType.F:
-            # here load is the position and value of point force
+            # For point load, the variable "load" is no longer a function,
+            # but the position and value of point force
             pos, f = load
             for i, N in enumerate(bas_func):
+                # equivalent force * unit displacement = actual force * displacement
                 Pe[i] = f * N(pos-xstart, h)
 
         elif load_type == LoadType.M:
-            # here load is the position and value of moment
+            # For Moment, the variable "load" is consist of the position and value of moment
             pos, m = load
             for i, N in enumerate(bas_func_1st):
+                # equivalent moment * unit rotation = actual moment * rotation (1st derivative)
                 Pe[i] = m * N(pos-xstart, h)
         return Pe
 
     @staticmethod
     def app_func(x, u, domain, num_elements):
         """
-        approximate a function f with basis function phi_i and coordinates u_i such that
-        $$
-        f = \sum u_iphi_i
-        $$
+        Approximates a function value f(x) using basis functions and provided coefficients, s.t. f(x) = Σui×φi(x)
 
-        :param x: the input
-        :param u: coefficient of basis function
-        :param domain: [start,end]
-        :param num_elements:
-        :return f: the approximate function with basis functions
+        Parameters:
+            x (float): The point at which to evaluate the approximation f(x).
+            u (np.ndarray): Coefficients of the basis functions.
+            domain (list): The [start, end] of the global domain.
+            num_elements (int): The number of elements in the domain.
+
+        Returns:
+            float: The approximated function value at x.
         """
+
         start, end = domain
         element_len = (end - start) / num_elements
-        node_list = np.linspace(start, end, num_elements + 1)
-        bas_func, _ = LocalElement._loc_basis_func()
+        node_list = np.linspace(start, end, num_elements + 1) # list of nodes
+        bas_func, _ = LocalElement._loc_basis_func()          # local basis function
 
-        start_idx = int(x/element_len)
-        end_idx = start_idx + 1
-        start = node_list[start_idx]
+        start_idx = int(x/element_len)                        #
+        end_idx = start_idx + 1                               #
+        start = node_list[start_idx]                          # 
 
         f_val = 0
         f_val += u[start_idx*2] * bas_func[0](x - start, element_len)
