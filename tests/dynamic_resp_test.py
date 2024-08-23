@@ -34,7 +34,7 @@ def test_dynamic_fem():
     stsol = fem.stsol[0:2 * (num_elements + 1):2]
 
     # Solve the dynamic system
-    fem.solv(tau=0.1, num_steps=200, soltype=SolvType.DYNAMIC)
+    fem.solv(tau=0.1, num_steps=200, sol_type=SolvType.DYNAMIC)
 
     # Get the dynamic solution
     dysol = fem.dysol[0:2 * (num_elements + 1):2, :]
