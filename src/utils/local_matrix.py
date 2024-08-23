@@ -121,7 +121,7 @@ class LocalElement:
         Returns:
             Pe (np.ndarray): The numerical equivalent nodal force vector.
         """
-        Pe = np.zeros(4)
+        Pe = np.zeros(4) # [F1, M1, F2, M2], where F1 is the equivalent point force at first node, M1 is the equivalent moment
         bas_func, bas_func_1st = LocalElement._loc_basis_func()
 
         # For arbitrary distributed load
@@ -174,17 +174,23 @@ class LocalElement:
         node_list = np.linspace(start, end, num_elements + 1) # list of nodes
         bas_func, _ = LocalElement._loc_basis_func()          # local basis function
 
-        start_idx = int(x/element_len)                        #
-        end_idx = start_idx + 1                               #
-        start = node_list[start_idx]                          # 
+        # find the element where x locate at
+        start_idx = int(x/element_len)                        # the index of left node at the element
+        end_idx = start_idx + 1                               # the index of right node at the element
+        start = node_list[start_idx]                          # the cooridinate of the start node
 
-        f_val = 0
-        f_val += u[start_idx*2] * bas_func[0](x - start, element_len)
-        f_val += u[start_idx*2 + 1] * bas_func[1](x - start, element_len)
+        # calculate the approximate value of function by adding values of basis functions
+        f_val = 0                                                              # initialization
+        f_val += u[start_idx*2] * bas_func[0](x - start, element_len)          # adding value of 1st basis function of 1st node
+        f_val += u[start_idx*2 + 1] * bas_func[1](x - start, element_len)      # adding value of 2nd basis function of 1st node
 
+        # when x is located at the right boundary of beam
+        # start_node is the last node of the beam
+        # we do not have a end node
+        # Hence we need to determine whether an end node exists
         if end_idx < len(node_list):
-            f_val += u[end_idx*2] * bas_func[2](x - start, element_len)
-            f_val += u[end_idx*2 +1] * bas_func[3](x - start, element_len)
+            f_val += u[end_idx*2] * bas_func[2](x - start, element_len)        # adding value of 1st basis function of 2nd node
+            f_val += u[end_idx*2 +1] * bas_func[3](x - start, element_len)     # adding value of 2nd basis function of 2nd node
 
         return f_val
 

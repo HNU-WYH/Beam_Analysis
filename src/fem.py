@@ -6,6 +6,10 @@ from src.utils.newmark import NewMark
 
 
 class FEM:
+    """
+    This class represents the postprocessing of a beam structure, including apply forces, apply constraints, and solving.
+    .
+    """
     def __init__(self, beam: Beam):
         self.S = None
         self.M = None
