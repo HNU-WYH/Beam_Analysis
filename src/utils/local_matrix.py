@@ -261,17 +261,27 @@ class LocalElement2D:
 
     @staticmethod
     def _init_local_matrix():
-        """
-
-        :return:
-        """
         # symbols
         x, E, I, h, A, rho = sp.symbols('x E I h A rho')
 
-        # basis function
         # longitudinal
         u1 = x / h
         u2 = 1 - x / h
+
+        u_list = [u1, u2]
+
+        # initialize the stiffness and mass matrix
+        M_l = sp.Matrix.zeros(2, 2)
+        S_l = sp.Matrix.zeros(2, 2)
+
+        # compute S and M
+        for i in range(2):
+            for j in range(i, 2):
+                M_l[i, j] = rho * sp.integrate(u_list[i] * u_list[j], (x, 0, h))
+                M_l[j, i] = M_l[i, j]
+
+                S_l[i, j] = E * A * sp.integrate(sp.diff(u_list[i], x) * sp.diff(u_list[j], x), (x, 0, h))
+                S_l[j, i] = S_l[i, j]
 
         # vertical
         f1 = 1 - 3 * (x / h) ** 2 + 2 * (x / h) ** 3
@@ -279,34 +289,58 @@ class LocalElement2D:
         f3 = 3 * (x / h) ** 2 - 2 * (x / h) ** 3
         f4 = h * (x / h) ** 2 * (x / h - 1)
 
-        f_list = [u1, f1, f2, u2, f3, f4]
+        f_list = [f1, f2, f3, f4]
 
         # initialize the stiffness and mass matrix
-        M = sp.Matrix.zeros(6, 6)
-        S = sp.Matrix.zeros(6, 6)
+        M_v = sp.Matrix.zeros(4, 4)
+        S_v = sp.Matrix.zeros(4, 4)
 
         # compute S and M
         for i in range(4):
             for j in range(i, 4):
-                M[i, j] = rho * sp.integrate(f_list[i] * f_list[j], (x, 0, h))
-                M[j, i] = M[i, j]
+                M_v[i, j] = rho * sp.integrate(f_list[i] * f_list[j], (x, 0, h))
+                M_v[j, i] = M_v[i, j]
 
-                S[i, j] = E * I * sp.integrate(sp.diff(f_list[i], x, 2) * sp.diff(f_list[j], x, 2), (x, 0, h))
-                S[j, i] = S[i, j]
-        return S, M
+                S_v[i, j] = E * I * sp.integrate(sp.diff(f_list[i], x, 2) * sp.diff(f_list[j], x, 2), (x, 0, h))
+                S_v[j, i] = S_v[i, j]
 
-
-
-
+        return S_l, M_l, S_v, M_v
 
     @staticmethod
-    def evaluate():
-        pass
+    def evaluate(E_val, I_val, A_val, rho_val, h_val):
+        """
+        Numerically evaluates the local stiffness and mass matrices using the provided material and geometric properties.
+
+        Parameters:
+            E_val (float): Young's modulus.
+            A_val (float): Area of cross-section
+            I_val (float): Moment of inertia.
+            rho_val (float): Density.
+            h_val (float): Length of the element.
+
+        Returns:
+            S_num (np.ndarray), M_num (np.ndarray): The numerical stiffness matrix & mass matrix.
+        """
+        Sl, Ml, Sv, Mv = LocalElement2D._init_local_matrix()
+
+        Sl_func = sp.lambdify((sp.symbols('h E A')), Sl, "numpy")
+        Ml_func = sp.lambdify((sp.symbols('h rho')), Ml, "numpy")
+        Sv_func = sp.lambdify((sp.symbols('h E I')), Sv, "numpy")
+        Mv_func = sp.lambdify((sp.symbols('h rho')), Mv, "numpy")
+
+        Sl_num = Sl_func(h_val, E_val, A_val)
+        Ml_num = Ml_func(h_val, rho_val)
+        Sv_num = Sv_func(h_val, E_val, I_val)
+        Mv_num = Mv_func(h_val, rho_val)
+
+        return np.array(Sl_num), np.array(Ml_num), np.array(Sv_num), np.array(Mv_num)
 
 
 if __name__ == "__main__":
-    S,M = LocalElement._init_local_matrix()
+    S1, M1, S2, M2 = LocalElement2D.evaluate(1,1,1,1,1)
     print("the Stiffness Matrix:")
-    print(S)
+    print(S1,S2)
     print("\nthe Mass Matrix:")
-    print(M)
+    print(M1, M2)
+
+
