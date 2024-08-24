@@ -6,7 +6,7 @@ from config import LoadType
 
 class LocalElement:
     """
-    Properties & Calculation in an local element [node_i,node_{i+1}]
+    Properties & Calculation in an one-dimensional local element [node_i,node_{i+1}]
     """
     @staticmethod
     def _loc_basis_func():
@@ -194,42 +194,119 @@ class LocalElement:
 
         return f_val
 
+class LocalElement2D:
+    """
+        Properties & Calculation in a two-dimensional local element of beam [node_i,node_{i+1}] with longitudinal & vertical displacement.
 
-def approximation_test():
-    import matplotlib.pyplot as plt
-    num_elements = 5
-    plot_precision = 100
-    domain = [0, 2 * np.pi]
-    x_values = np.linspace(domain[0], domain[1], plot_precision)
-    node_list = np.linspace(domain[0], domain[1], num_elements + 1)
+        For 2-dimensional structure, we need additionally consider the longitudinal deformation using the PDE below:
 
-    # Create u as coefficients of the basis functions to approximate sin(x)
-    u = np.zeros(2 * len(node_list))
-    u[0::2] = np.sin(node_list)  # coefficients for phi_2i-1
-    u[1::2] = np.cos(node_list)  # coefficients for phi_2i
+        ρü - (EAu')' = f
 
-    # Get the approximate function
-    approx_values = np.array([LocalElement.app_func(x, u, domain, num_elements) for x in x_values])
+        where
+        - ρ is the density,
+        - E is the young module
+        - A is the area of cross-section
+        - u is the axial deformation,
+        - f is the distributed axial force.
 
-    # Original function
-    original_function = np.sin(x_values)
-    x = np.linspace(domain[0], domain[1], 200)
-    sin_x = np.sin(x)
+        By using weak formulation & galerkin method, the above PDE becomes the following matrix equation:
 
-    # Plot the original function and the approximation
-    plt.plot(x, sin_x, label='Original sin(x)')
-    plt.plot(x_values, approx_values, label='Approximation', linestyle='--')
-    plt.legend()
-    plt.xlabel('x')
-    plt.ylabel('f(x)')
-    plt.title('Approximation of sin(x) using basis functions')
-    plt.show()
+        Mä + Sa = q + F(L)e_L - F(0)e_0
+
+        where:
+        - u = Σ a_i φ_i
+        - M_{ij} = ∫ ρ φ_i φ_j dx
+        - S_{ij} = ∫ EA φ_i' φ_j' dx
+        - q_i = ∫ f φ_i dx
+        - F(L),F(0) is the axial force at x = L and x = 0
+        - e_0, e_L is the unit vector
+
+        By rearranging the stiffness, matrix of longitudinal and vertical displacement & slopes,
+        we can get the 2-dimensional S & M matrices in a local element:
+
+        Let u1,u2 be the basis function of longitudinal deformation
+        Let f1,f2,f3,f4 be the basis function of vertical displacement & slopes
+
+        Then we have the following matrix equation:
+
+        Mä + Sa = q + M_Le_L - M_0e_0 + Q_Le_L - Q_0e_0 + F_Le_L - F_0e_0
+
+        where
+
+        S = [∫ EA u1' u1' dx, ∫ EA u1' u2' dx, ... , 0                , 0                , 0                , 0                , ... ],
+            [∫ EA u2' u1' dx, ∫ EA u2' u2' dx, ... , 0                , 0                , 0                , 0                , ... ],
+            [⋮              , ⋮              , ⋮   , ⋮                , ⋮                , ⋮                , ⋮                , ... ],
+            [0              , 0              , ... , ∫ EI f1'' f1'' dx, ∫ EI f1'' f2'' dx, ∫ EI f1'' f3'' dx, ∫ EI f1'' f4'' dx, ... ],
+            [0              , 0              , ... , ∫ EI f2'' f1'' dx, ∫ EI f2'' f2'' dx, ∫ EI f2'' f3'' dx, ∫ EI f2'' f4'' dx, ... ],
+            [0              , 0              , ... , ∫ EI f3'' f1'' dx, ∫ EI f3'' f2'' dx, ∫ EI f3'' f3'' dx, ∫ EI f3'' f4'' dx, ... ],
+            [0              , 0              , ... , ∫ EI f4'' f1'' dx, ∫ EI f4'' f2'' dx, ∫ EI f4'' f3'' dx, ∫ EI f4'' f4'' dx, ... ]
+            [⋮              , ⋮              , ⋮   , ⋮                , ⋮                , ⋮                , ⋮                , ⋮   ],
+
+        M = [∫ ρ u1 u1 dx, ∫ ρ u1 u2 dx , ... , 0              , 0              , 0              , 0              , ... ],
+            [∫ ρ u2 u1 dx, ∫ ρ u2 u2 dx , ... , 0              , 0              , 0              , 0              , ... ],
+            [⋮           , ⋮            , ... , ⋮              , ⋮              , ⋮              , ⋮              , ... ],
+            [0           , 0            , ... , ∫ ρ f1 f1 dx   , ∫ ρ f1 f2 dx   , ∫ ρ f1 f3 dx   , ∫ ρ f1 f4 dx   , ... ],
+            [0           , 0            , ... , ∫ ρ f2 f1 dx   , ∫ ρ f2 f2 dx   , ∫ ρ f2 f3 dx   , ∫ ρ f2 f4 dx   , ... ],
+            [0           , 0            , ... , ∫ ρ f3 f1 dx   , ∫ ρ f3 f2 dx   , ∫ ρ f3 f3 dx   , ∫ ρ f3 f4 dx   , ... ],
+            [0           , 0            , ... , ∫ ρ f4 f1 dx   , ∫ ρ f4 f2 dx   , ∫ ρ f4 f3 dx   , ∫ ρ f4 f4 dx   , ... ]
+            [⋮           , ⋮            , ⋮   , ⋮              , ⋮              , ⋮              , ⋮              , ... ],
+
+        Longitudinal & vertical displacements and slopes at the nodes of the beam is:
+
+        x(t) = [v_1(t), ... , v_n(t), w_1(t), ... , w_{2n}(t)]^T = Σa_iu_i + Σa_if_i
+
+        with longitudinal displacement first and vertical displacement second,
+        where a is the coefficient,u_i & f_i is the longitudinal & vertical basis function
+    """
+
+    @staticmethod
+    def _init_local_matrix():
+        """
+
+        :return:
+        """
+        # symbols
+        x, E, I, h, A, rho = sp.symbols('x E I h A rho')
+
+        # basis function
+        # longitudinal
+        u1 = x / h
+        u2 = 1 - x / h
+
+        # vertical
+        f1 = 1 - 3 * (x / h) ** 2 + 2 * (x / h) ** 3
+        f2 = h * (x / h) * (x / h - 1) ** 2
+        f3 = 3 * (x / h) ** 2 - 2 * (x / h) ** 3
+        f4 = h * (x / h) ** 2 * (x / h - 1)
+
+        f_list = [u1, f1, f2, u2, f3, f4]
+
+        # initialize the stiffness and mass matrix
+        M = sp.Matrix.zeros(6, 6)
+        S = sp.Matrix.zeros(6, 6)
+
+        # compute S and M
+        for i in range(4):
+            for j in range(i, 4):
+                M[i, j] = rho * sp.integrate(f_list[i] * f_list[j], (x, 0, h))
+                M[j, i] = M[i, j]
+
+                S[i, j] = E * I * sp.integrate(sp.diff(f_list[i], x, 2) * sp.diff(f_list[j], x, 2), (x, 0, h))
+                S[j, i] = S[i, j]
+        return S, M
+
+
+
+
+
+    @staticmethod
+    def evaluate():
+        pass
 
 
 if __name__ == "__main__":
-    # LocMat = LocalElement()
-    # print("the Stiffness Matrix:")
-    # print(np.array(LocMat.S))
-    # print("\nthe Mass Matrix:")
-    # print(np.array(LocMat.M))
-    approximation_test()
+    S,M = LocalElement._init_local_matrix()
+    print("the Stiffness Matrix:")
+    print(S)
+    print("\nthe Mass Matrix:")
+    print(M)
