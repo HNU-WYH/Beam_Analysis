@@ -92,6 +92,7 @@ class Beam2D:
         rho (float): The density of the beam material.
         I (float): The moment of inertia of the beam's cross-section.
         A (float): The area of the beam's cross-section.
+        angle (float): The angle between the beam and x-ais (from -pi to pi).
         nodes (np.ndarray): An array of node positions along the length of the beam, evenly spaced between 0 and L.
         element_len (float): The length of each finite element, calculated as L divided by the number of elements.
         elements (list): A list of pairs, where each pair contains the indices of the nodes that form a finite element.
@@ -99,7 +100,7 @@ class Beam2D:
         M (np.ndarray): The global mass matrix, assembled by stacking local mass matrices from all elements.
         """
 
-    def __init__(self, length, young_module, area, density, moment_inertia, num_elements):
+    def __init__(self, length, young_module, area, density, moment_inertia, num_elements, angle = 0):
         """
         Initializes the Beam object with physical & FEM properties, and assembles the global matrices without considering
         the external forces & constraints.
@@ -111,6 +112,7 @@ class Beam2D:
             density (float): The density of the beam material.
             moment_inertia (float): The moment of inertia of the beam's cross-section.
             num_elements (int): The number of finite elements used to discretize the beam.
+            angle (float): The angle between the beam and x-ais (from -pi to pi).
         """
         self.num_elements = num_elements  # Number of finite elements
         self.num_nodes = num_elements + 1  # Number of nodes
@@ -120,6 +122,7 @@ class Beam2D:
         self.A = area # area of cross-section
         self.rho = density  # Density
         self.L = length  # Length of the beam
+        self.angle = angle
 
         self.nodes = np.linspace(0, self.L, self.num_nodes)  # positions of all nodes evenly spaced along the beam
         self.element_len = self.L / self.num_elements  # Length of each element
