@@ -84,7 +84,7 @@ class Beam2D:
     This class represents the preprocessing of a two-dimensional beam structure, with vertical & longitudinal displacement,
     which can also be used to assembly a two-dimensional framework.
 
-    Attributes(TBD):
+    Attributes:
         num_elements (int): The number of finite elements used to discretize the beam.
         num_nodes (int): The number of nodes used to discretize the beam.
         L (float): The total length of the beam.
@@ -184,9 +184,20 @@ class Beam2D:
 
         return Sl, Ml
 
+    def get_node_pos(self):
+        """
+        :return: the list of all nodes' coordinates (x_i,y_i) with the first node setting to be (0,0)
+        """
+        coordinates = []
+        for position in self.nodes:
+            x_global = position * np.cos(self.angle)
+            y_global = position * np.sin(self.angle)
+            coordinates.append((x_global,y_global))
+        return coordinates
+
 if __name__ == "__main__":
     # Example of creating a Beam object and printing the global matrices
-    beam2D = Beam2D(length=3, young_module=1, area=1, density=1, moment_inertia=1, num_elements=3)
+    beam2D = Beam2D(length=3, young_module=1, area=1, density=1, moment_inertia=1, num_elements=3, angle= -0.25 * np.pi)
 
     # Print the global stiffness matrix
     print("the global stiffness matrix")
@@ -195,3 +206,8 @@ if __name__ == "__main__":
     # Print the global mass matrix (rounded to 2 decimal places)
     print("the global mass matrix")
     print(np.round(beam2D.M, 2))
+
+    # Print the coordinate of every node in the beam
+    print("the coordinates")
+    coordinates = beam2D.get_node_pos()
+    print(coordinates)

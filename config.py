@@ -16,6 +16,9 @@ class SolvType(Enum):
     STATIC = "get the static and time-independent solution"
     DYNAMIC = "get the time-dependent solution"
 
+class ConnectionType(Enum):
+    Hinge = "Interconnection with changeable angle "
+    Fix = "Interconnection with fixed angle"
 
 def uniform_load_function(x):
     return 1.0  # Constant distributed load of 1000 N/m

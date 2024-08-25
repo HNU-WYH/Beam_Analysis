@@ -229,9 +229,11 @@ class LocalElement2D:
 
         Then we have the following matrix equation:
 
-        Mä + Sa = q + M_Le_L - M_0e_0 + Q_Le_L - Q_0e_0 + F_Le_L - F_0e_0
+        Mä + Sa = q + M_Lc_L - M_0c_0 + Q_Ld_L - Q_0d_0 + F_Le_L - F_0e_0
 
         where
+
+        e,d,c are unit vector
 
         S = [∫ EA u1' u1' dx, ∫ EA u1' u2' dx, ... , 0                , 0                , 0                , 0                , ... ],
             [∫ EA u2' u1' dx, ∫ EA u2' u2' dx, ... , 0                , 0                , 0                , 0                , ... ],
@@ -337,7 +339,7 @@ class LocalElement2D:
 
 
 if __name__ == "__main__":
-    S1, M1, S2, M2 = LocalElement2D.evaluate(1,1,1,1,1)
+    S1, M1, S2, M2 = LocalElement2D._init_local_matrix()
     print("the Stiffness Matrix:")
     print(S1,S2)
     print("\nthe Mass Matrix:")
