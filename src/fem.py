@@ -113,7 +113,7 @@ class FEM:
         """
         self.constraints.append((node, value, constraint_Type))
 
-    def __apply_constraint(self):
+    def _apply_constraint(self):
         """
         The 'add_constraint' method only append the given constraints to our list of constraints (self.constraints).
         No expansion of global mass & stiffness matrices is made.
@@ -166,7 +166,7 @@ class FEM:
         Raises:
             Exception: If the solution type is incorrectly defined.
         """
-        self.__apply_constraint()  # Apply constraints to the global matrices
+        self._apply_constraint()  # Apply constraints to the global matrices
 
         if sol_type == SolvType.STATIC:
             # Static solution
