@@ -1,3 +1,4 @@
+import math
 import unittest
 
 from config import LoadType, ConstraintType, SolvType, ConnectionType
@@ -14,7 +15,7 @@ class TestCasesForFramework(unittest.TestCase):
 
         # Initialize the beam
         beam_1 = Beam2D(length, E, A, rho, I, num_elements)
-        beam_2 = Beam2D(length, E, A, rho, I, num_elements, angle=-45)
+        beam_2 = Beam2D(length, E, A, rho, I, num_elements, angle=-math.pi / 4)
 
         # Initialize FEM Framework model
         frame_work = FrameworkFEM()
@@ -27,7 +28,7 @@ class TestCasesForFramework(unittest.TestCase):
         frame_work.add_connection(beam_1, beam_2, (1, 0), ConnectionType.Hinge)
 
         # Apply a force of 50 at position 5 (the right end of beam_1)
-        frame_work.apply_force(beam_1, (5, 50), LoadType.F)
+        frame_work.add_force(beam_1, (5, 50), LoadType.F)
 
         # Add constraints
         frame_work.add_constraint(beam_1, 0, 0, ConstraintType.DISPLACEMENT)
@@ -35,10 +36,10 @@ class TestCasesForFramework(unittest.TestCase):
         frame_work.add_constraint(beam_2, 49, 0, ConstraintType.DISPLACEMENT)
 
         # Solve the static system
-        frame_work.solve()
+        frame_work.solv()
 
         # Solve the dynamic system
-        frame_work.solve(tau=0.1, num_steps=200, sol_type=SolvType.DYNAMIC)
+        frame_work.solv(tau=0.1, num_steps=200, sol_type=SolvType.DYNAMIC)
 
         # Visualize the solution
         frame_work.visualize()
