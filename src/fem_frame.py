@@ -46,9 +46,14 @@ class FrameworkFEM:
 
         # properties for FEM analysis
         self._activate = False  # flag to activate the FEM analysis
+        self._connections_global = []  # List with connections between beams with (global_node_index1,
+        # global_node_index2, connection_type)
+        self._constraints_global = []  # List to store applied constraints globally with (global_node_index, value,
+        # constraint_Type)
+        self._force_global = []  # List to store applied forces globally with (global_node_index, force, force_type)
         self.S_global = None  # Global stiffness Matrix for framework
         self.M_global = None  # Global stiffness Matrix for framework
-        self.f_global = None  # the global equivalent nodal force vector
+        self.q = np.zeros(3 * self.num_nodes)  # Initialize the global equivalent nodal force vector with zeros
         self.stsol = None  # Static solution vector (to be computed)
         self.dysol = None  # Dynamic solution vector (to be computed)
 
@@ -101,7 +106,7 @@ class FrameworkFEM:
 
         Parameters:
             beam (Beam2D): Beam2D object to which the constraint is applied
-            node (int): The node index to which the constraint is applied
+            node (int): The node index (local) to which the constraint is applied
             value (float): The value of the constraint
             constraint_Type (ConstraintType): The type of constraint, which can be a displacement or rotation
         """
@@ -109,6 +114,36 @@ class FrameworkFEM:
             self.constraints.append((beam, node, value, constraint_Type))
         else:
             raise Exception("Cannot add constraint after activating the FEM analysis")
+
+    def _converge_global_connections(self):
+        """
+        Converge the connections to the global index
+        """
+        for connection in self.connections:
+            beam1, beam2, connect_node_pair, connection_type = connection
+            node1, node2 = connect_node_pair
+            if node1 == 0:
+                global_node1 = self.nodes[self.beams.index(beam1)][0]
+            elif node1 == 1:
+                global_node1 = self.nodes[self.beams.index(beam1)][-1]
+            else:
+                raise Exception("Invalid node index")
+            if node2 == 0:
+                global_node2 = self.nodes[self.beams.index(beam2)][0]
+            elif node2 == 1:
+                global_node2 = self.nodes[self.beams.index(beam2)][-1]
+            else:
+                raise Exception("Invalid node index")
+            self._connections_global.append((global_node1, global_node2, connection))
+
+    def _converge_global_constraints(self):
+        """
+        Converge the constraints to the global index
+        """
+        for i in range(len(self.constraints)):
+            beam, node, value, constraint_Type = self.constraints[i]
+            global_node = self.nodes[self.beams.index(beam)][node]
+            self._constraints_global.append((global_node, value, constraint_Type))
 
     def _generate_global_index(self):
         """
@@ -156,21 +191,8 @@ class FrameworkFEM:
         for index, beam in enumerate(self.beams):
             connection_pairs[self.nodes[index][0]] = []
             connection_pairs[self.nodes[index][-1]] = []
-        for connection in self.connections:
-            beam1, beam2, connect_node_pair, connection_type = connection
-            node1, node2 = connect_node_pair
-            if node1 == 0:
-                node1 = self.nodes[self.beams.index(beam1)][0]
-            elif node1 == 1:
-                node1 = self.nodes[self.beams.index(beam1)][-1]
-            else:
-                raise Exception("Invalid node index")
-            if node2 == 0:
-                node2 = self.nodes[self.beams.index(beam2)][0]
-            elif node2 == 1:
-                node2 = self.nodes[self.beams.index(beam2)][-1]
-            else:
-                raise Exception("Invalid node index")
+        for connection in self._connections_global:
+            node1, node2, connection_type = connection
             connection_pairs[node1].append(node2)
             connection_pairs[node2].append(node1)
         return connection_pairs
@@ -252,9 +274,27 @@ class FrameworkFEM:
         M_new[n1:, m1:] = matrix2
         return M_new
 
+    def _converge_global_force(self):
+        """
+        Converge the forces to the global index
+        """
+        for force in self.forces:
+            beam, load, load_type = force
+            nodes = self.nodes[self.beams.index(beam)]
+            if load_type == LoadType.F:
+                position, magnitude = load
+                # TODO
+            elif load_type == LoadType.q:
+                for i in range(beam.num_elements):
+                    # TODO
+                    pass
+            elif load_type == LoadType.M:
+                position, magnitude = load
+                # TODO
+            else:
+                raise Exception("Invalid load type")
+
     def _assemble_frame_matrices(self):
-        self._generate_global_index()
-        self._generate_global_coordinates()
         # Assemble the global mass and stiffness matrices for the framework
         self.beams[0].assemble_matrices()
         S = self.beams[0].S
@@ -263,15 +303,55 @@ class FrameworkFEM:
             beam2d.assemble_matrices()
             S = self.__extend_matrix(S, beam2d.S)
             M = self.__extend_matrix(M, beam2d.M)
-        self.S_global = S
-        self.M_global = M
-        # Assemble the global constraints matrix
-
-        # expand the global mass and stiffness matrices to include the constraints
-
+        # Assemble the global constraints matrix by list
+        C_list = []
+        # add constraints for connection
+        for connection in self._connections_global:
+            node1, node2, connection_type = connection
+            if connection_type == ConnectionType.Hinge:
+                c = np.zeros(S.shape[0])
+                # TODO
+                C_list.append(c)
+            elif connection_type == ConnectionType.Fix:
+                c = np.zeros(S.shape[0])
+                # TODO
+                C_list.append(c)
+        # add boundary constraints
+        for constraint in self._constraints_global:
+            node, value, constraint_type = constraint
+            c = np.zeros(S.shape[0])
+            if constraint_type == ConstraintType.DISPLACEMENT:
+                c[3 * node] = 1
+            elif constraint_type == ConstraintType.ROTATION:
+                c[3 * node + 1] = 1
+            C_list.append(c)
+        # extend the global matrix and add constraints matrix into global stiffness matrix
+        self.S_global = self.__extend_matrix(S, np.zeros((len(C_list), len(C_list))))
+        self.M_global = self.__extend_matrix(M, np.zeros((len(C_list), len(C_list))))
+        for c in C_list:
+            self.S_global[:, S.shape[0]] = c[:]
+            self.S_global[S.shape[0], :] = c[:]
         # apply the forces to the global equivalent nodal force vector
+        for force in self._force_global:
+            node, magnitude, load_type = force
+            if load_type == LoadType.q:
+                raise Exception(
+                    "Distributed load not supported, please activate the FEM analysis before applying the load")
+            elif load_type == LoadType.F:
+                self.q[3 * node] += magnitude
+            elif load_type == LoadType.M:
+                self.q[3 * node + 1] = magnitude
 
-        pass
+    def activate(self):
+        """
+        Activates the FEM analysis for the beam structure and locks the framework for further modifications.
+        """
+        self._activate = True
+        self._generate_global_index()
+        self._converge_global_connections()
+        self._converge_global_constraints()
+        self._generate_global_coordinates()
+        self._converge_global_force()
 
     def solv(self, num_steps=None, tau=None, sol_type=SolvType.STATIC, beta=0.25, gamma=0.5):
         """
@@ -287,7 +367,7 @@ class FrameworkFEM:
         Raises:
             Exception: If the solution type is incorrectly defined
         """
-        self._activate = True
+        self.activate()
         self._assemble_frame_matrices()
 
         if sol_type == SolvType.STATIC:
