@@ -20,7 +20,7 @@ class FrameworkFEM:
         connections (list): List with connections between beams
         constraints (list): List to store applied constraints with (beam, node, value, constraint_Type)
         forces (list): List to store applied forces with (beam, force, force_type)
-        nodes (list): List of corresponding nodes index [[1,...,n], [n+1, ... , m], ... ]
+        nodes (list): List of corresponding nodes index [[0,1,...,n-1], [n, ... , m+1], ... ]
         coordinates (list): list of global coordinates of nodes [(x1,y1),(x2,y2), ..., (x_{n+m},y_{n+m}), ...]
         num_nodes (int): Number of nodes in the framework
         num_elements (int): Number of elements in the framework
@@ -45,6 +45,7 @@ class FrameworkFEM:
         self.num_elements = 0
 
         # properties for FEM analysis
+        self._activate = False  # flag to activate the FEM analysis
         self.S_global = None  # Global stiffness Matrix for framework
         self.M_global = None  # Global stiffness Matrix for framework
         self.f_global = None  # the global equivalent nodal force vector
@@ -58,7 +59,10 @@ class FrameworkFEM:
         Parameters:
             beam (Beam2D): Beam2D object to be added to the framework
         """
-        self.beams.append(beam)
+        if not self._activate:
+            self.beams.append(beam)
+        else:
+            raise Exception("Cannot add beam after activating the FEM analysis")
 
     def add_connection(self, beam1: Beam2D, beam2: Beam2D, connect_node_pair, connection_type: ConnectionType):
         """
@@ -71,7 +75,10 @@ class FrameworkFEM:
                 The node should be 0 (left end) or 1(right end).
             connection_type (ConnectionType): The type of connection between the beams
         """
-        self.connections.append((beam1, beam2, connect_node_pair, connection_type))
+        if not self._activate:
+            self.connections.append((beam1, beam2, connect_node_pair, connection_type))
+        else:
+            raise Exception("Cannot add connection after activating the FEM analysis")
 
     def add_force(self, beam: Beam2D, load, load_type):
         """
@@ -83,7 +90,10 @@ class FrameworkFEM:
                 For distributed loads, this is a function of position.
             load_type (LoadType): The type of load, which can be a distributed load (q), point force (F), or moment (M).
         """
-        self.forces.append((beam, load, load_type))
+        if not self._activate:
+            self.forces.append((beam, load, load_type))
+        else:
+            raise Exception("Cannot add force after activating the FEM analysis")
 
     def add_constraint(self, beam: Beam2D, node, value, constraint_Type: ConstraintType):
         """
@@ -95,7 +105,10 @@ class FrameworkFEM:
             value (float): The value of the constraint
             constraint_Type (ConstraintType): The type of constraint, which can be a displacement or rotation
         """
-        self.constraints.append((beam, node, value, constraint_Type))
+        if not self._activate:
+            self.constraints.append((beam, node, value, constraint_Type))
+        else:
+            raise Exception("Cannot add constraint after activating the FEM analysis")
 
     def _generate_global_index(self):
         """
@@ -105,11 +118,10 @@ class FrameworkFEM:
         """
         for i in range(len(self.beams)):
             self.nodes.append(list(range(self.num_nodes, self.num_nodes + self.beams[i].num_nodes)))
-            self.coordinates.extend(self.beams[i].nodes)
             self.num_nodes += self.beams[i].num_nodes
             self.num_elements += self.beams[i].num_elements
 
-    def __generate_local_coordinates(self, initial_position, beam: Beam2D, beam_index: int):
+    def __generate_local_coordinates(self, initial_position, beam: Beam2D):
         """
         Generate the local coordinates for the beam
         The local coordinates are a list of tuples, where each tuple contains the x and y coordinates of the corresponding node.
@@ -120,24 +132,105 @@ class FrameworkFEM:
             beam (Beam2D): The Beam2D object for which to generate the local coordinates
         """
         x0, y0 = initial_position
-        x1, y1 = beam.nodes[0]
         angle = beam.angle
         local_coordinates = []
-        for node in beam.nodes:
-            x, y = node
-            x_new = x0 + (x - x1) * np.cos(angle) - (y - y1) * np.sin(angle)
-            y_new = y0 + (x - x1) * np.sin(angle) + (y - y1) * np.cos(angle)
+        nodes = self.nodes[self.beams.index(beam)]
+        unit_length = beam.element_len
+        for node in range(beam.num_nodes):
+            x_new = x0 + node * unit_length * np.cos(angle)
+            y_new = y0 + node * unit_length * np.sin(angle)
             local_coordinates.append((x_new, y_new))
-        nodes = self.nodes[beam_index]
-        self.coordinates[nodes[0] - 1:nodes[-1] - 1] = local_coordinates
+        self.coordinates[nodes[0]:nodes[-1]] = local_coordinates
+        if len(self.coordinates) > self.num_nodes:
+            for i in range(len(self.coordinates) - self.num_nodes):
+                self.coordinates.pop()
+
+    def __generate_global_adjacency_connection_list(self):
+        """
+        Generate the global adjacency connection list for the framework
+
+        Returns:
+            dict: A dictionary where the keys are the node indices and the values are lists of the connected node
+        """
+        connection_pairs = {}
+        for index, beam in enumerate(self.beams):
+            connection_pairs[self.nodes[index][0]] = []
+            connection_pairs[self.nodes[index][-1]] = []
+        for connection in self.connections:
+            beam1, beam2, connect_node_pair, connection_type = connection
+            node1, node2 = connect_node_pair
+            if node1 == 0:
+                node1 = self.nodes[self.beams.index(beam1)][0]
+            elif node1 == 1:
+                node1 = self.nodes[self.beams.index(beam1)][-1]
+            else:
+                raise Exception("Invalid node index")
+            if node2 == 0:
+                node2 = self.nodes[self.beams.index(beam2)][0]
+            elif node2 == 1:
+                node2 = self.nodes[self.beams.index(beam2)][-1]
+            else:
+                raise Exception("Invalid node index")
+            connection_pairs[node1].append(node2)
+            connection_pairs[node2].append(node1)
+        return connection_pairs
+
+    def _get_beam_from_node(self, node) -> Beam2D | None:
+        """
+        Get the beam object from the node index
+
+        Parameters:
+            node (int): The node index
+
+        Returns:
+            Beam2D: The Beam2D object corresponding to the node index
+        """
+        for beam in self.beams:
+            if node in self.nodes[self.beams.index(beam)]:
+                return beam
+        return None
 
     def _generate_global_coordinates(self):
         """
-        Generate the global coordinates for the framework
-        The global coordinates are a list of tuples, where each tuple contains the x and y coordinates of the corresponding node.
-        The global coordinates are used to visualize the solution of the framework.
+        This function uses deep first search to generate the global coordinates for the framework.
         """
-        pass
+        # initialize the global coordinates
+        self.coordinates = [(0, 0)] * self.num_nodes
+        adjacency_list = self.__generate_global_adjacency_connection_list()
+        # beam is a dictionary, the key is the beam name, and the value is the set of two nodes that make up the beam
+        visited_beams = set()
+        visited_nodes = set()
+
+        def dfs(beam: Beam2D):
+            if beam in visited_beams:
+                return
+            visited_beams.add(beam)
+
+            beam_index = self.beams.index(beam)
+            # 获取当前beam的两个node
+            nodes = [self.nodes[beam_index][0], self.nodes[beam_index][-1]]
+
+            # 对这两个node进行遍历，找到与之相连的其他nodes
+            for node in nodes:
+                if node in visited_nodes:
+                    continue
+                visited_nodes.add(node)
+
+                # 获取与当前node相连的所有其他nodes
+                connected_nodes = adjacency_list.get(node, [])
+
+                # 通过这些相连的nodes找到所有相关的beams
+                for connected_node in connected_nodes:
+                    new_beam = self._get_beam_from_node(connected_node)
+                    if new_beam is None:
+                        raise Exception("Invalid connection")
+                    if new_beam not in visited_beams:
+                        self.__generate_local_coordinates(self.coordinates[node], new_beam)
+                        dfs(new_beam)
+
+        # 从起始beam开始遍历
+        self.__generate_local_coordinates((0, 0), self.beams[0])
+        dfs(self.beams[0])
 
     @staticmethod
     def __extend_matrix(matrix1, matrix2) -> np.ndarray:
@@ -194,6 +287,7 @@ class FrameworkFEM:
         Raises:
             Exception: If the solution type is incorrectly defined
         """
+        self._activate = True
         self._assemble_frame_matrices()
 
         if sol_type == SolvType.STATIC:
