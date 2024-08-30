@@ -35,6 +35,9 @@ class TestCasesForFramework(unittest.TestCase):
         frame_work.add_constraint(beam_1, 0, 0, ConstraintType.ROTATION)
         frame_work.add_constraint(beam_2, -1, 0, ConstraintType.DISPLACEMENT)
 
+        # assemble the global matrices
+        frame_work.assemble_frame_matrices()
+
         # Solve the static system
         frame_work.solv()
 

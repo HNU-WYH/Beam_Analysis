@@ -287,7 +287,10 @@ class FrameworkFEM:
             else:
                 raise Exception("Invalid load type")
 
-    def _assemble_frame_matrices(self):
+    def assemble_frame_matrices(self):
+        if self._activate:
+            return
+        self.__activate()
         # Assemble the global mass and stiffness matrices for the framework
         self.beams[0].assemble_matrices()
         S = self.beams[0].S
@@ -359,7 +362,7 @@ class FrameworkFEM:
             elif load_type == LoadType.M:
                 self.q[3 * node + 1] = magnitude
 
-    def activate(self):
+    def __activate(self):
         """
         Activates the FEM analysis for the beam structure and locks the framework for further modifications.
         """
@@ -384,9 +387,7 @@ class FrameworkFEM:
         Raises:
             Exception: If the solution type is incorrectly defined
         """
-        if not self._activate:
-            self.activate()
-            self._assemble_frame_matrices()
+        self.assemble_frame_matrices()
 
         if sol_type == SolvType.STATIC:
             # Static solution
