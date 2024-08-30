@@ -416,4 +416,28 @@ class FrameworkFEM:
             raise Exception("Wrong defined type of solution")
 
     def visualize(self):
-        pass
+        x = [coord[0] for coord in self.coordinates]
+        y = [coord[1] for coord in self.coordinates]
+        x_old = x.copy()
+        y_old = y.copy()
+        for beam in self.beams:
+            angle = beam.angle
+            nodes = self.nodes[self.beams.index(beam)]
+            beam_start = nodes[0]
+            nodes_local = [node - beam_start for node in nodes]
+            w = self.stsol[
+                3 * beam_start + beam.num_nodes: 3 * beam_start + beam.num_nodes + 2 * nodes_local[-1] + 1: 2]
+            v = self.stsol[3 * beam_start: 3 * beam_start + nodes_local[-1] + 1]
+            # x = x0 + w * sin(angle) + v * cos(angle)
+            x[nodes[0]:nodes[-1] + 1] -= np.cos(angle) * w + np.sin(angle) * v
+            # y = y0 - w * cos(angle) + v * sin(angle)
+            y[nodes[0]:nodes[-1] + 1] -= -np.sin(angle) * w + np.cos(angle) * v
+
+        # plot the original beam (self.coordinates) and the deformed beam (x, y)
+        plt.plot(x_old, y_old, 'b-', label='Original Beam')
+        plt.plot(x, y, 'r-', label='Deformed Beam')
+        plt.xlabel('x')
+        plt.ylabel('y')
+        plt.title('Deformed Beam')
+        plt.legend()
+        plt.show()

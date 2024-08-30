@@ -1,5 +1,6 @@
 import math
 import unittest
+import matplotlib.pyplot as plt
 
 from config import LoadType, ConstraintType, SolvType, ConnectionType
 from src.beam import Beam2D
@@ -28,7 +29,7 @@ class TestCasesForFramework(unittest.TestCase):
         frame_work.add_connection(beam_1, beam_2, (-1, 0), ConnectionType.Hinge)
 
         # Apply a force of 50 at position -1 (node) (the right end of beam_1)
-        frame_work.add_force(beam_1, (-1, 50), LoadType.F)
+        frame_work.add_force(beam_1, (-1, 500000), LoadType.F)
 
         # Add constraints
         frame_work.add_constraint(beam_1, 0, 0, ConstraintType.DISPLACEMENT)
@@ -46,8 +47,6 @@ class TestCasesForFramework(unittest.TestCase):
 
         # Visualize the solution
         frame_work.visualize()
-
-        self.assertEqual(True, True)
 
 
 if __name__ == '__main__':
