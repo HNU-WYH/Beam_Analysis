@@ -306,43 +306,53 @@ class FrameworkFEM:
         # add constraints for connection
         for connection in self._connections_global:
             node1, node2, connection_type = connection
-            beam1_angle = self._get_beam_from_node(node1).angle
-            beam2_angle = self._get_beam_from_node(node2).angle
+            beam1 = self._get_beam_from_node(node1)
+            beam2 = self._get_beam_from_node(node2)
+            beam1_start = self.nodes[self.beams.index(beam1)][0]
+            beam2_start = self.nodes[self.beams.index(beam2)][0]
+            node1_local = node1 - beam1_start
+            node2_local = node2 - beam2_start
             # cos(φ1) v1(L1, t) − sin(φ1) w1(L1, t) − cos(φ2) v2(0, t) + sin(φ2) w2(0, t) = 0
             c1 = np.zeros(S.shape[0])
-            c1[3 * node1] = math.cos(beam1_angle)
-            c1[3 * node1 + 1] = -math.sin(beam1_angle)
-            c1[3 * node2] = -math.cos(beam2_angle)
-            c1[3 * node2 + 1] = math.sin(beam2_angle)
+            c1[3 * beam1_start + node1_local] = math.cos(beam1.angle)
+            c1[3 * beam1_start + beam1.num_nodes + 2 * node1_local] = -math.sin(beam1.angle)
+            c1[3 * beam2_start + node2_local] = -math.cos(beam2.angle)
+            c1[3 * beam2_start + beam2.num_nodes + 2 * node2_local] = math.sin(beam2.angle)
             C_list.append(c1)
             # sin(φ1) v1(L1, t) + cos(φ1) w1(L1, t) − sin(φ2) v2(0, t) − cos(φ2) w2(0, t) = 0
             c2 = np.zeros(S.shape[0])
-            c2[3 * node1] = math.sin(beam1_angle)
-            c2[3 * node1 + 1] = math.cos(beam1_angle)
-            c2[3 * node2] = -math.sin(beam2_angle)
-            c2[3 * node2 + 1] = -math.cos(beam2_angle)
+            c2[3 * beam1_start + node1_local] = math.sin(beam1.angle)
+            c2[3 * beam1_start + beam1.num_nodes + 2 * node1_local] = math.cos(beam1.angle)
+            c2[3 * beam2_start + node2_local] = -math.sin(beam2.angle)
+            c2[3 * beam2_start + beam2.num_nodes + 2 * node2_local] = -math.cos(beam2.angle)
             C_list.append(c2)
             if connection_type == ConnectionType.Fix:  # Fix connection，fixed angle
                 # w1′ (L1, t) − w2′ (0, t) = 0
                 c3 = np.zeros(S.shape[0])
-                c3[3 * node1 + 2] = 1
-                c3[3 * node2 + 2] = -1
+                c3[3 * beam1_start + 2 * beam1.num_nodes + 1] = 1
+                c3[3 * beam2_start + 2 * beam2.num_nodes + 1] = -1
                 C_list.append(c3)
 
         # add boundary constraints
         for constraint in self._constraints_global:
             node, value, constraint_type = constraint
+            beam = self._get_beam_from_node(node)
+            beam_start = self.nodes[self.beams.index(beam)][0]
+            node_local = node - beam_start
             if constraint_type == ConstraintType.DISPLACEMENT:
+                # v1(0, t) = 0
                 c1 = np.zeros(S.shape[0])
-                c1[3 * node] = 1
+                c1[3 * beam_start + node_local] = 1
                 C_list.append(c1)
+                # w1(0, t) = 0
                 c2 = np.zeros(S.shape[0])
-                c2[3 * node + 1] = 1
+                c2[3 * beam_start + beam.num_nodes + 2 * node_local] = 1
                 C_list.append(c2)
             elif constraint_type == ConstraintType.ROTATION:
-                c = np.zeros(S.shape[0])
-                c[3 * node + 2] = 1
-                C_list.append(c)
+                # w1′ (0,t) = 0
+                c3 = np.zeros(S.shape[0])
+                c3[3 * beam_start + beam.num_nodes + 2 * node_local + 1] = 1
+                C_list.append(c3)
 
         # extend the global matrix and add constraints matrix into global stiffness matrix
         self.S_global = self.__extend_matrix(S, np.zeros((len(C_list), len(C_list))))
@@ -354,13 +364,16 @@ class FrameworkFEM:
         self.q = np.zeros(self.S_global.shape[0])
         for force in self._force_global:
             node, magnitude, load_type = force
+            beam = self._get_beam_from_node(node)
+            beam_start = self.nodes[self.beams.index(beam)][0]
+            node_local = node - beam_start
             if load_type == LoadType.q:
                 raise Exception(
                     "Distributed load not supported, please activate the FEM analysis before applying the load")
             elif load_type == LoadType.F:
-                self.q[3 * node] += magnitude
+                self.q[3 * beam_start + beam.num_nodes + 2 * node_local] += magnitude
             elif load_type == LoadType.M:
-                self.q[3 * node + 1] = magnitude
+                self.q[3 * beam_start + beam.num_nodes + 2 * node_local + 1] = magnitude
 
     def __activate(self):
         """
