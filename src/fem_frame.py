@@ -384,8 +384,9 @@ class FrameworkFEM:
         Raises:
             Exception: If the solution type is incorrectly defined
         """
-        self.activate()
-        self._assemble_frame_matrices()
+        if not self._activate:
+            self.activate()
+            self._assemble_frame_matrices()
 
         if sol_type == SolvType.STATIC:
             # Static solution
