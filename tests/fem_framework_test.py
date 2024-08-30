@@ -25,15 +25,15 @@ class TestCasesForFramework(unittest.TestCase):
         frame_work.add_beam(beam_2)
 
         # Add connections between beams
-        frame_work.add_connection(beam_1, beam_2, (1, 0), ConnectionType.Hinge)
+        frame_work.add_connection(beam_1, beam_2, (-1, 0), ConnectionType.Hinge)
 
-        # Apply a force of 50 at position 5 (the right end of beam_1)
-        frame_work.add_force(beam_1, (5, 50), LoadType.F)
+        # Apply a force of 50 at position -1 (node) (the right end of beam_1)
+        frame_work.add_force(beam_1, (-1, 50), LoadType.F)
 
         # Add constraints
         frame_work.add_constraint(beam_1, 0, 0, ConstraintType.DISPLACEMENT)
         frame_work.add_constraint(beam_1, 0, 0, ConstraintType.ROTATION)
-        frame_work.add_constraint(beam_2, 49, 0, ConstraintType.DISPLACEMENT)
+        frame_work.add_constraint(beam_2, -1, 0, ConstraintType.DISPLACEMENT)
 
         # Solve the static system
         frame_work.solv()

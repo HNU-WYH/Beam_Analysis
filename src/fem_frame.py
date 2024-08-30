@@ -1,3 +1,5 @@
+import math
+
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -19,14 +21,14 @@ class FrameworkFEM:
         beams (list): List of Beam2D objects in the beam structure
         connections (list): List with connections between beams
         constraints (list): List to store applied constraints with (beam, node, value, constraint_Type)
-        forces (list): List to store applied forces with (beam, force, force_type)
-        nodes (list): List of corresponding nodes index [[0,1,...,n-1], [n, ... , m+1], ... ]
-        coordinates (list): list of global coordinates of nodes [(x1,y1),(x2,y2), ..., (x_{n+m},y_{n+m}), ...]
+        forces (list): List to store applied forces with (beam_idx, force, force_type)
+        nodes (list): List of corresponding nodes index [[1,...,n], [n+1, ... , m], ... ]
+        coordinates (list): List of global coordinates of nodes [(x1,y1),(x2,y2), ..., (x_{n+m},y_{n+m}), ...]
         num_nodes (int): Number of nodes in the framework
         num_elements (int): Number of elements in the framework
         S_global (np.ndarray): Global stiffness Matrix for framework
         M_global (np.ndarray): Global stiffness Matrix for framework
-        f_global (np.ndarray): the global equivalent nodal force vector
+        q (np.ndarray): Global equivalent nodal force vector
         stsol (np.ndarray): Static solution vector (to be computed)
         dysol (np.ndarray): Dynamic solution vector (to be computed)
     """
@@ -53,7 +55,7 @@ class FrameworkFEM:
         self._force_global = []  # List to store applied forces globally with (global_node_index, force, force_type)
         self.S_global = None  # Global stiffness Matrix for framework
         self.M_global = None  # Global stiffness Matrix for framework
-        self.q = np.zeros(3 * self.num_nodes)  # Initialize the global equivalent nodal force vector with zeros
+        self.q = None  # Initialize the global equivalent nodal force vector with zeros
         self.stsol = None  # Static solution vector (to be computed)
         self.dysol = None  # Dynamic solution vector (to be computed)
 
@@ -76,8 +78,8 @@ class FrameworkFEM:
         Parameters:
             beam1 (Beam2D): First Beam2D object to be connected
             beam2 (Beam2D): Second Beam2D object to be connected
-            connect_node_pair (tuple): The node pair of the two beams to be connected `(node of beam1, node of beam2)`.
-                The node should be 0 (left end) or 1(right end).
+            connect_node_pair (tuple): The node (local) pair of the two beams to be connected `(node of beam1, node of beam2)`.
+                The node could be 0 (left end) or -1 (right end).
             connection_type (ConnectionType): The type of connection between the beams
         """
         if not self._activate:
@@ -91,8 +93,8 @@ class FrameworkFEM:
 
         Parameters:
             beam (Beam2D): Beam2D object to which the force is applied
-            load (tuple): The load to apply. For point loads and moments, this is a tuple (position, magnitude).
-                For distributed loads, this is a function of position.
+            load (tuple): The load to apply. For point loads and moments, this is a tuple (node (local), magnitude).
+                For distributed loads, this is a function of position. Use `0` as the left end and `-1` as the last end.
             load_type (LoadType): The type of load, which can be a distributed load (q), point force (F), or moment (M).
         """
         if not self._activate:
@@ -106,7 +108,7 @@ class FrameworkFEM:
 
         Parameters:
             beam (Beam2D): Beam2D object to which the constraint is applied
-            node (int): The node index (local) to which the constraint is applied
+            node (int): The node index (local) to which the constraint is applied. You can use `-1` as the last node.
             value (float): The value of the constraint
             constraint_Type (ConstraintType): The type of constraint, which can be a displacement or rotation
         """
@@ -122,18 +124,8 @@ class FrameworkFEM:
         for connection in self.connections:
             beam1, beam2, connect_node_pair, connection_type = connection
             node1, node2 = connect_node_pair
-            if node1 == 0:
-                global_node1 = self.nodes[self.beams.index(beam1)][0]
-            elif node1 == 1:
-                global_node1 = self.nodes[self.beams.index(beam1)][-1]
-            else:
-                raise Exception("Invalid node index")
-            if node2 == 0:
-                global_node2 = self.nodes[self.beams.index(beam2)][0]
-            elif node2 == 1:
-                global_node2 = self.nodes[self.beams.index(beam2)][-1]
-            else:
-                raise Exception("Invalid node index")
+            global_node1 = self.nodes[self.beams.index(beam1)][node1]
+            global_node2 = self.nodes[self.beams.index(beam2)][node2]
             self._connections_global.append((global_node1, global_node2, connection))
 
     def _converge_global_constraints(self):
@@ -280,17 +272,18 @@ class FrameworkFEM:
         """
         for force in self.forces:
             beam, load, load_type = force
-            nodes = self.nodes[self.beams.index(beam)]
+            global_nodes = self.nodes[self.beams.index(beam)]
             if load_type == LoadType.F:
-                position, magnitude = load
-                # TODO
-            elif load_type == LoadType.q:
-                for i in range(beam.num_elements):
-                    # TODO
-                    pass
+                local_node, magnitude = load
+                node = global_nodes[local_node]
+                self._force_global.append((node, magnitude, load_type))
             elif load_type == LoadType.M:
-                position, magnitude = load
+                local_node, magnitude = load
+                node = global_nodes[local_node]
+                self._force_global.append((node, magnitude, load_type))
+            elif load_type == LoadType.q:
                 # TODO
+                pass
             else:
                 raise Exception("Invalid load type")
 
@@ -303,35 +296,59 @@ class FrameworkFEM:
             beam2d.assemble_matrices()
             S = self.__extend_matrix(S, beam2d.S)
             M = self.__extend_matrix(M, beam2d.M)
+
         # Assemble the global constraints matrix by list
         C_list = []
+
         # add constraints for connection
         for connection in self._connections_global:
             node1, node2, connection_type = connection
-            if connection_type == ConnectionType.Hinge:
-                c = np.zeros(S.shape[0])
-                # TODO
-                C_list.append(c)
-            elif connection_type == ConnectionType.Fix:
-                c = np.zeros(S.shape[0])
-                # TODO
-                C_list.append(c)
+            beam1_angle = self._get_beam_from_node(node1).angle
+            beam2_angle = self._get_beam_from_node(node2).angle
+            # cos(φ1) v1(L1, t) − sin(φ1) w1(L1, t) − cos(φ2) v2(0, t) + sin(φ2) w2(0, t) = 0
+            c1 = np.zeros(S.shape[0])
+            c1[3 * node1] = math.cos(beam1_angle)
+            c1[3 * node1 + 1] = -math.sin(beam1_angle)
+            c1[3 * node2] = -math.cos(beam2_angle)
+            c1[3 * node2 + 1] = math.sin(beam2_angle)
+            C_list.append(c1)
+            # sin(φ1) v1(L1, t) + cos(φ1) w1(L1, t) − sin(φ2) v2(0, t) − cos(φ2) w2(0, t) = 0
+            c2 = np.zeros(S.shape[0])
+            c2[3 * node1] = math.sin(beam1_angle)
+            c2[3 * node1 + 1] = math.cos(beam1_angle)
+            c2[3 * node2] = -math.sin(beam2_angle)
+            c2[3 * node2 + 1] = -math.cos(beam2_angle)
+            C_list.append(c2)
+            if connection_type == ConnectionType.Fix:  # Fix connection，fixed angle
+                # w1′ (L1, t) − w2′ (0, t) = 0
+                c3 = np.zeros(S.shape[0])
+                c3[3 * node1 + 2] = 1
+                c3[3 * node2 + 2] = -1
+                C_list.append(c3)
+
         # add boundary constraints
         for constraint in self._constraints_global:
             node, value, constraint_type = constraint
-            c = np.zeros(S.shape[0])
             if constraint_type == ConstraintType.DISPLACEMENT:
-                c[3 * node] = 1
+                c1 = np.zeros(S.shape[0])
+                c1[3 * node] = 1
+                C_list.append(c1)
+                c2 = np.zeros(S.shape[0])
+                c2[3 * node + 1] = 1
+                C_list.append(c2)
             elif constraint_type == ConstraintType.ROTATION:
-                c[3 * node + 1] = 1
-            C_list.append(c)
+                c = np.zeros(S.shape[0])
+                c[3 * node + 2] = 1
+                C_list.append(c)
+
         # extend the global matrix and add constraints matrix into global stiffness matrix
         self.S_global = self.__extend_matrix(S, np.zeros((len(C_list), len(C_list))))
         self.M_global = self.__extend_matrix(M, np.zeros((len(C_list), len(C_list))))
         for c in C_list:
-            self.S_global[:, S.shape[0]] = c[:]
-            self.S_global[S.shape[0], :] = c[:]
+            self.S_global[:len(c), S.shape[0]] = c[:]
+            self.S_global[S.shape[0], :len(c)] = c[:]
         # apply the forces to the global equivalent nodal force vector
+        self.q = np.zeros(self.S_global.shape[0])
         for force in self._force_global:
             node, magnitude, load_type = force
             if load_type == LoadType.q:
@@ -372,13 +389,13 @@ class FrameworkFEM:
 
         if sol_type == SolvType.STATIC:
             # Static solution
-            self.stsol = np.linalg.solve(self.S_global, self.f_global)
+            self.stsol = np.linalg.solve(self.S_global, self.q)
 
         elif sol_type == SolvType.DYNAMIC:
             # Dynamic solution using Newmark's method
             newmark_solver = NewMark(tau, num_steps, beta, gamma)
-            init_condis = np.zeros(self.f_global.shape)
-            self.dysol, _, _ = newmark_solver.solve(self.M_global, self.S_global, self.f_global, init_condis,
+            init_condis = np.zeros(self.q.shape)
+            self.dysol, _, _ = newmark_solver.solve(self.M_global, self.S_global, self.q, init_condis,
                                                     init_condis, init_condis)
         else:
             raise Exception("Wrong defined type of solution")
