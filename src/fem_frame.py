@@ -373,7 +373,7 @@ class FrameworkFEM:
             elif load_type == LoadType.F:
                 self.q[3 * beam_start + beam.num_nodes + 2 * node_local] += magnitude
             elif load_type == LoadType.M:
-                self.q[3 * beam_start + beam.num_nodes + 2 * node_local + 1] = magnitude
+                self.q[3 * beam_start + beam.num_nodes + 2 * node_local + 1] += magnitude
 
     def __activate(self):
         """
