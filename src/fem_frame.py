@@ -126,7 +126,7 @@ class FrameworkFEM:
             node1, node2 = connect_node_pair
             global_node1 = self.nodes[self.beams.index(beam1)][node1]
             global_node2 = self.nodes[self.beams.index(beam2)][node2]
-            self._connections_global.append((global_node1, global_node2, connection))
+            self._connections_global.append((global_node1, global_node2, connection[3]))
 
     def _converge_global_constraints(self):
         """
@@ -344,9 +344,9 @@ class FrameworkFEM:
         # extend the global matrix and add constraints matrix into global stiffness matrix
         self.S_global = self.__extend_matrix(S, np.zeros((len(C_list), len(C_list))))
         self.M_global = self.__extend_matrix(M, np.zeros((len(C_list), len(C_list))))
-        for c in C_list:
-            self.S_global[:len(c), S.shape[0]] = c[:]
-            self.S_global[S.shape[0], :len(c)] = c[:]
+        for i, c in enumerate(C_list):
+            self.S_global[:len(c), S.shape[0] + i] = c[:]
+            self.S_global[S.shape[0] + i, :len(c)] = c[:]
         # apply the forces to the global equivalent nodal force vector
         self.q = np.zeros(self.S_global.shape[0])
         for force in self._force_global:
