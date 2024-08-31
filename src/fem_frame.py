@@ -118,7 +118,7 @@ class FrameworkFEM:
         else:
             raise Exception("Cannot add constraint after activating the FEM analysis")
 
-    def _converge_global_connections(self):
+    def _convert_global_connections(self):
         """
         Converge the connections to the global index
         """
@@ -129,7 +129,7 @@ class FrameworkFEM:
             global_node2 = self.nodes[self.beams.index(beam2)][node2]
             self._connections_global.append((global_node1, global_node2, connection[3]))
 
-    def _converge_global_constraints(self):
+    def _convert_global_constraints(self):
         """
         Converge the constraints to the global index
         """
@@ -168,10 +168,7 @@ class FrameworkFEM:
             x_new = x0 + node * unit_length * np.cos(angle)
             y_new = y0 + node * unit_length * np.sin(angle)
             local_coordinates.append((x_new, y_new))
-        self.coordinates[nodes[0]:nodes[-1]] = local_coordinates
-        if len(self.coordinates) > self.num_nodes:
-            for i in range(len(self.coordinates) - self.num_nodes):
-                self.coordinates.pop()
+        self.coordinates[nodes[0]:nodes[-1] + 1] = local_coordinates
 
     def __generate_global_adjacency_connection_list(self):
         """
@@ -267,7 +264,7 @@ class FrameworkFEM:
         M_new[n1:, m1:] = matrix2
         return M_new
 
-    def _converge_global_force(self):
+    def _convert_global_force(self):
         """
         Converge the forces to the global index
         """
@@ -361,6 +358,7 @@ class FrameworkFEM:
         for i, c in enumerate(C_list):
             self.S_global[:len(c), S.shape[0] + i] = c[:]
             self.S_global[S.shape[0] + i, :len(c)] = c[:]
+
         # apply the forces to the global equivalent nodal force vector
         self.q = np.zeros(self.S_global.shape[0])
         for force in self._force_global:
@@ -382,10 +380,10 @@ class FrameworkFEM:
         """
         self._activate = True
         self._generate_global_index()
-        self._converge_global_connections()
-        self._converge_global_constraints()
+        self._convert_global_connections()
+        self._convert_global_constraints()
         self._generate_global_coordinates()
-        self._converge_global_force()
+        self._convert_global_force()
 
     def solv(self, num_steps=None, tau=None, sol_type=SolvType.STATIC, beta=0.25, gamma=0.5):
         """
@@ -463,9 +461,8 @@ class FrameworkFEM:
                 dx_d = np.sin(angle) * w_d - np.cos(angle) * v_d
                 # y = y0 - w * cos(angle) - v * sin(angle)
                 dy_d = -np.cos(angle) * w_d - np.sin(angle) * v_d
-                for i in range(self.dysol.shape[1]):
-                    x_d[nodes[0]:nodes[-1] + 1, i] += dx_d[:, i]
-                    y_d[nodes[0]:nodes[-1] + 1, i] += dy_d[:, i]
+                x_d[nodes[0]:nodes[-1] + 1,] += dx_d[:,]
+                y_d[nodes[0]:nodes[-1] + 1,] += dy_d[:,]
 
             # Create a figure for the dynamic animation
             fig, ax = plt.subplots()
