@@ -2,6 +2,7 @@ import math
 
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib import animation
 
 from src.beam import Beam2D
 from src.utils.local_matrix import LocalElement2D
@@ -415,29 +416,78 @@ class FrameworkFEM:
         else:
             raise Exception("Wrong defined type of solution")
 
-    def visualize(self):
+    def visualize(self, sol_type=SolvType.STATIC):
         x = [coord[0] for coord in self.coordinates]
         y = [coord[1] for coord in self.coordinates]
-        x_old = x.copy()
-        y_old = y.copy()
-        for beam in self.beams:
-            angle = beam.angle
-            nodes = self.nodes[self.beams.index(beam)]
-            beam_start = nodes[0]
-            nodes_local = [node - beam_start for node in nodes]
-            w = self.stsol[
-                3 * beam_start + beam.num_nodes: 3 * beam_start + beam.num_nodes + 2 * nodes_local[-1] + 1: 2]
-            v = self.stsol[3 * beam_start: 3 * beam_start + nodes_local[-1] + 1]
-            # x = x0 + w * sin(angle) - v * cos(angle)
-            x[nodes[0]:nodes[-1] + 1] += np.sin(angle) * w - np.cos(angle) * v
-            # y = y0 - w * cos(angle) - v * sin(angle)
-            y[nodes[0]:nodes[-1] + 1] -= np.cos(angle) * w + np.sin(angle) * v
 
-        # plot the original beam (self.coordinates) and the deformed beam (x, y)
-        plt.plot(x_old, y_old, 'b-', label='Original Beam')
-        plt.plot(x, y, 'r-', label='Deformed Beam')
-        plt.xlabel('x')
-        plt.ylabel('y')
-        plt.title('Deformed Beam')
-        plt.legend()
-        plt.show()
+        if sol_type == SolvType.STATIC:
+            x_st = x.copy()
+            y_st = y.copy()
+            for beam in self.beams:
+                angle = beam.angle
+                nodes = self.nodes[self.beams.index(beam)]
+                beam_start = nodes[0]
+                nodes_local = [node - beam_start for node in nodes]
+                w = self.stsol[
+                    3 * beam_start + beam.num_nodes: 3 * beam_start + beam.num_nodes + 2 * nodes_local[-1] + 1: 2]
+                v = self.stsol[3 * beam_start: 3 * beam_start + nodes_local[-1] + 1]
+                # x = x0 + w * sin(angle) - v * cos(angle)
+                x_st[nodes[0]:nodes[-1] + 1] += np.sin(angle) * w - np.cos(angle) * v
+                # y = y0 - w * cos(angle) - v * sin(angle)
+                y_st[nodes[0]:nodes[-1] + 1] -= np.cos(angle) * w + np.sin(angle) * v
+
+            # plot the original beam (self.coordinates) and the static deformed beam (x, y)
+            plt.plot(x, y, 'b-', label='Original Beam')
+            plt.plot(x_st, y_st, 'r-', label='Deformed Beam')
+            plt.xlabel('x')
+            plt.ylabel('y')
+            plt.title('Deformed Beam')
+            plt.legend()
+            plt.show()
+
+        elif sol_type == SolvType.DYNAMIC:
+            x_d = np.zeros((len(x), self.dysol.shape[1]))
+            y_d = np.zeros((len(y), self.dysol.shape[1]))
+            for i in range(self.dysol.shape[1]):
+                x_d[:, i] = x
+                y_d[:, i] = y
+            for beam in self.beams:
+                angle = beam.angle
+                nodes = self.nodes[self.beams.index(beam)]
+                beam_start = nodes[0]
+                nodes_local = [node - beam_start for node in nodes]
+                w_d = self.dysol[
+                      3 * beam_start + beam.num_nodes: 3 * beam_start + beam.num_nodes + 2 * nodes_local[-1] + 1: 2, :]
+                v_d = self.dysol[3 * beam_start: 3 * beam_start + nodes_local[-1] + 1, :]
+                # x = x0 + w * sin(angle) - v * cos(angle)
+                dx_d = np.sin(angle) * w_d - np.cos(angle) * v_d
+                # y = y0 - w * cos(angle) - v * sin(angle)
+                dy_d = -np.cos(angle) * w_d - np.sin(angle) * v_d
+                for i in range(self.dysol.shape[1]):
+                    x_d[nodes[0]:nodes[-1] + 1, i] += dx_d[:, i]
+                    y_d[nodes[0]:nodes[-1] + 1, i] += dy_d[:, i]
+
+            # Create a figure for the dynamic animation
+            fig, ax = plt.subplots()
+            line, = ax.plot([], [], 'r-', label='Dynamic Solution')
+
+            ax.plot(x, y, 'b-', label='Original Beam')
+            ax.set_xlim(np.min(x_d), np.max(x_d))
+            ax.set_ylim(np.min(y_d), np.max(y_d))
+            ax.set_xlabel('x')
+            ax.set_ylabel('y')
+            ax.set_title('Dynamic Solution Over Time')
+            ax.legend(loc="upper left")
+
+            # Update function for animation
+            def update(frame):
+                line.set_data(x_d[:, frame], y_d[:, frame])
+                return line,
+
+            # Create animation
+            ani = animation.FuncAnimation(fig, update, frames=self.dysol.shape[1], blit=True)
+
+            # Save the animation as a GIF
+            # ani.save(r'..\output\dynamic_solution.gif', writer='imagemagick', fps=30)
+
+            plt.show()

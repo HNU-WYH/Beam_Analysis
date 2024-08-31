@@ -46,6 +46,7 @@ class TestCasesForFramework(unittest.TestCase):
 
         # Visualize the solution
         frame_work.visualize()
+        frame_work.visualize(sol_type=SolvType.DYNAMIC)
 
     def test_2(self):
         # Initialize two simple beam with 50 nodes and length 5.0
@@ -85,6 +86,7 @@ class TestCasesForFramework(unittest.TestCase):
 
         # Visualize the solution
         frame_work.visualize()
+        frame_work.visualize(sol_type=SolvType.DYNAMIC)
 
     def test_3(self):
         # Initialize two simple beam with 50 nodes and length 5.0
@@ -119,6 +121,7 @@ class TestCasesForFramework(unittest.TestCase):
 
         # Visualize the solution
         frame_work.visualize()
+        frame_work.visualize(sol_type=SolvType.DYNAMIC)
 
 
 if __name__ == '__main__':
