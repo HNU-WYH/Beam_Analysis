@@ -428,10 +428,10 @@ class FrameworkFEM:
             w = self.stsol[
                 3 * beam_start + beam.num_nodes: 3 * beam_start + beam.num_nodes + 2 * nodes_local[-1] + 1: 2]
             v = self.stsol[3 * beam_start: 3 * beam_start + nodes_local[-1] + 1]
-            # x = x0 + w * sin(angle) + v * cos(angle)
-            x[nodes[0]:nodes[-1] + 1] -= np.cos(angle) * w + np.sin(angle) * v
-            # y = y0 - w * cos(angle) + v * sin(angle)
-            y[nodes[0]:nodes[-1] + 1] -= -np.sin(angle) * w + np.cos(angle) * v
+            # x = x0 + w * sin(angle) - v * cos(angle)
+            x[nodes[0]:nodes[-1] + 1] += np.sin(angle) * w - np.cos(angle) * v
+            # y = y0 - w * cos(angle) - v * sin(angle)
+            y[nodes[0]:nodes[-1] + 1] -= np.cos(angle) * w + np.sin(angle) * v
 
         # plot the original beam (self.coordinates) and the deformed beam (x, y)
         plt.plot(x_old, y_old, 'b-', label='Original Beam')
