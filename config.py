@@ -9,24 +9,29 @@ class LoadType(Enum):
 
 class ConstraintType(Enum):
     ROTATION = "fix the rotation"
-    DISPLACEMENT = "fix the displacement"
+    DISPLACEMENT = "fix the transverse displacement"
+    AXIAL = "fix the displacement along the axis"
 
 
 class SolvType(Enum):
     STATIC = "get the static and time-independent solution"
     DYNAMIC = "get the time-dependent solution"
+    EIGEN = "get the time-dependent solution based on eigenvalue method"
+
+class ConnectionType(Enum):
+    Hinge = "Interconnection with changeable angle "
+    Fix = "Interconnection with fixed angle"
+
+def uniform_load_function(x, value = 1.0):
+    return value  # Constant distributed load of 1000 N/m
 
 
-def uniform_load_function(x):
-    return 1.0  # Constant distributed load of 1000 N/m
+def triangular_load_function(x, value = 1.0):
+    return x * value
 
 
-def triangular_load_function(x):
-    return x
-
-
-def partial_uniform_load_function(x):
-    if x <= 0.5:
-        return 1
+def partial_uniform_load_function(x, boundary = 0.5, value = 1.0):
+    if x <= boundary:
+        return value
     else:
         return 0
