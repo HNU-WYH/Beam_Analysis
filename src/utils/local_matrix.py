@@ -337,6 +337,128 @@ class LocalElement2D:
 
         return np.array(Sl_num), np.array(Ml_num), np.array(Sv_num), np.array(Mv_num)
 
+    @staticmethod
+    def _loc_basis_func():
+        """
+        In the finite element methods for 2D beams, each node typically has one longitudinal basis functions and
+        two transverse basis function:
+            - u1: representing the longitudinal displacement
+            - φ1: representing the transverse displacement
+            - φ2: representing the transverse slope, namely the derivative of displacement
+
+        For a given node j:
+            - u1(node_j) = δ_{ij}.
+
+            - φ1(node_j) = δ_{ij}.
+
+            - φ2'(node_j) = δ_{ij}.
+
+            - where δ_{ij} equals to 1 if i = j, otherwise 0.
+
+        :return:
+            l_bas_fuc (list): A list of longitudinal basis functions for node_i & node_{i+1}.
+            t_bas_func (list): A list of transverse basis functions for node_i & node_{i+1}.
+            t_bas_func_1st (list): A list of the first derivatives of transverse basis functions
+        """
+
+        l_bas_fuc = [
+            lambda x, h: x / h, # First longitudinal basis function
+            lambda x, h: 1 - x / h # Second longitudinal basis function
+        ]
+
+        t_bas_func = [
+            lambda x, h: 1 - 3 * (x / h) ** 2 + 2 * (x / h) ** 3,  # First basis function (φ1) of node_i
+            lambda x, h: h * (x / h) * (x / h - 1) ** 2,  # Second basis function (φ2) of node_i
+            lambda x, h: 3 * (x / h) ** 2 - 2 * (x / h) ** 3,  # First basis function of node_{i+1}
+            lambda x, h: h * (x / h) ** 2 * (x / h - 1)  # Second basis function of node_{i+1}
+        ]
+
+        # first derivative of basis function
+        t_bas_func_1st = [
+            lambda x, h: -6 * x / h ** 2 + 6 * x ** 2 / h ** 3,
+            # First derivative of First basis function (φ1') of node_i
+            lambda x, h: (x / h - 1) ** 2 + 2 * (x / h) * (x / h - 1),
+            # First derivative of Second basis function (φ2') of node_{i+1}
+            lambda x, h: 6 * x / h ** 2 - 6 * x ** 2 / h ** 3,  # First derivative of First basis function of node_i
+            lambda x, h: 2 * (x / h) * (x / h - 1) + x ** 2 / h ** 2
+            # First derivative of Second basis function of node_{i+1}
+        ]
+
+        return l_bas_fuc, t_bas_func, t_bas_func_1st
+
+    @staticmethod
+    def equal_force(load, load_type: LoadType, xstart, h, load_angle = np.pi/2):
+        """
+        When external load is not on the node of elements, an equivalent nodal forces is required  for further computation
+
+        This method converts longitudinal & transverse distributed loads, point forces, and moments into equivalent nodal forces,
+        using the equivalent virtual work principle, and then facilitate the following finite element method.
+
+        Parameters:
+            load (tuple or function): The load applied to the element. Can be a function (for distributed load) or a tuple (for point load or moment).
+            load_type (LoadType): The type of load (e.g., distributed, point force, moment).
+            xstart (float): The start position of the element in coordinates.
+            h (float): The length of a local element.
+            load_angle (float): The anticlockwise angle from the beam to the load, 0 means parallel.
+
+        Returns:
+            Pt,Pl (np.ndarray): The numerical equivalent nodal force vectors Pt,Pl in transverse & longitudinal direction .
+        """
+        # Initialization
+        Pt = np.zeros(4)  # [F1, M1, F2, M2], where F1 is the equivalent transverse point force at first node, M1 is the equivalent moment
+        Pl = np.zeros(2)  # [P1, P2], longitudinal force at the 1st node and 2nd node
+
+        l_bas_func , t_bas_func, t_bas_func_1st = LocalElement2D._loc_basis_func()
+
+        l_flag = np.abs(np.cos(load_angle)) > 1e-10 # whether the force is not perpendicular to the beam
+        t_flag = np.abs(np.sin(load_angle)) > 1e-10 # whether the force is not parallel to the beam
+
+        # For arbitrary distributed load
+        if load_type == LoadType.q:
+            # convert global load function load(x) into local one
+            # p_local is the distributed load in the current local element
+            def p_local(x_loc):
+                x = x_loc + xstart
+                return load(x)
+
+            if l_flag:
+                # if l_flag is true, force is not perpendicular to the beam
+                # the equivalent nodal force in the longitudinal direction should be computed
+                for i, N in enumerate(l_bas_func):
+                    # integrate the product of basis function and local distributed load from 0 to h.
+                    product = lambda x: p_local(x) * N(x, h) * np.cos(load_angle)
+                    Pl[i], _ = quad(product, 0, h)
+
+            if t_flag:
+                # if t_flag is true, the force is not parallel to the beam
+                # the equivalent nodal force in the transverse direction should be computed
+                for i, N in enumerate(t_bas_func):
+                    # integrate the product of basis function and local distributed load from 0 to h.
+                    product = lambda x: p_local(x) * N(x, h) * np.sin(load_angle)
+                    Pt[i], _ = quad(product, 0, h)
+
+        # For arbitrary point load
+        elif load_type == LoadType.F:
+            # For point load, the variable "load" is no longer a function,
+            # but the position and value of point force
+            pos, f = load
+            if l_flag:
+                for i, N in enumerate(l_bas_func):
+                    # equivalent force * unit displacement = actual force * displacement
+                    Pl[i] = f * N(pos - xstart, h) * np.cos(load_angle)
+
+            if t_flag:
+                for i, N in enumerate(t_bas_func):
+                    # equivalent force * unit displacement = actual force * displacement
+                    Pt[i] = f * N(pos - xstart, h) * np.sin(load_angle)
+
+        elif load_type == LoadType.M:
+            # For Moment, the variable "load" is consist of the position and value of moment
+            pos, m = load
+            for i, N in enumerate(t_bas_func_1st):
+                # equivalent moment * unit rotation = actual moment * rotation (1st derivative)
+                Pt[i] = m * N(pos - xstart, h)
+        return Pt,Pl
 
 if __name__ == "__main__":
     S1, M1, S2, M2 = LocalElement2D._init_local_matrix()

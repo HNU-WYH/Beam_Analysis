@@ -1,4 +1,6 @@
 import numpy as np
+
+from config import LoadType, uniform_load_function
 from src.utils.local_matrix import LocalElement, LocalElement2D
 
 
@@ -98,6 +100,7 @@ class Beam2D:
         elements (list): A list of pairs, where each pair contains the indices of the nodes that form a finite element.
         S (np.ndarray): The global stiffness matrix, assembled by stacking local stiffness matrices from all elements.
         M (np.ndarray): The global mass matrix, assembled by stacking local mass matrices from all elements.
+        q (nd.ndarray): The nodal force vector without the addition of constraints
         """
 
     def __init__(self, length, young_module, area, density, moment_inertia, num_elements, angle = 0):
@@ -134,6 +137,9 @@ class Beam2D:
 
         # Assemble global stiffness and mass matrices
         self.assemble_matrices()
+
+        # Intialize nodal force vector
+        self.q = np.zeros((3 * self.num_nodes, 1))
 
     def assemble_matrices(self):
         """
@@ -195,9 +201,112 @@ class Beam2D:
             coordinates.append((x_global,y_global))
         return coordinates
 
+
+    def add_force(self, load, load_type:LoadType, load_angle = np.pi/2, pos_flag = "idx"):
+        """
+        Applies a force or distributed load to the beam and updates the global force vector.
+
+        Parameters:
+            load (tuple or function): The load to apply. For point loads and moments, this is a tuple
+                                      (node index or position, magnitude). For distributed loads, this is a function of position.
+            load_type (LoadType): The type of load, which can be a distributed load (q), point force (F), or moment (M).
+            load_angle (float): The anticlockwise angle from the beam to the load, 0 means parallel.
+            pos_flag: "pos" or "idx". "pos" means the detailed position on the beam, "idx" means the index of the node being applied
+
+        """
+        # Initialization
+        ql = np.zeros((self.num_nodes, 1))
+        qt = np.zeros((2 * self.num_nodes, 1))
+
+        if load_type == LoadType.q:
+            # Apply distributed load over each element
+            for idx, xstart in enumerate(self.nodes[0:-1]):
+                pt, pl = LocalElement2D.equal_force(
+                    load,
+                    load_type,
+                    xstart,
+                    self.element_len,
+                    load_angle
+                )
+
+                ql[idx: idx + 2] += pl[:,None]
+                qt[2 * idx:2 * idx + 4] += pt[:,None]
+
+        elif load_type == LoadType.F:
+            # Apply point force
+            f_pos, f_val = load
+            if pos_flag == "idx":
+                qt[2 * f_pos] = f_val * np.sin(load_angle)
+                ql[f_pos] = f_val * np.cos(load_angle)
+
+            elif pos_flag == "pos":
+                idx = int(f_pos / self.element_len)
+                # check whether the position of force is beyond the range of beam
+                if f_pos > self.L or f_pos < 0:
+                    Warning("force applied beyond the beam, ignored", f_pos)
+
+                # the force is directly applied on nodes
+                elif f_pos in self.nodes:
+                    qt[2 * f_pos] = f_val * np.sin(load_angle)
+                    ql[f_pos] = f_val * np.cos(load_angle)
+
+                # if the force is not applied on nodes, computing its equivalent nodal force
+                else:
+                    pt, pl = LocalElement2D.equal_force(
+                        load,
+                        load_type,
+                        idx * self.element_len,
+                        self.element_len,
+                        load_angle
+                    )
+
+                    ql[idx: idx + 2] += pl[:,None]
+                    qt[2 * idx:2 * idx + 4] += pt[:,None]
+
+            else:
+                raise ValueError("pos_flag should be either 'idx' or 'pos'")
+
+        elif load_type == LoadType.M:
+            # Apply moment
+            m_pos, m_val = load
+            if pos_flag == "idx":
+                qt[2 * m_pos + 1] = m_val
+
+            elif pos_flag == "pos":
+                idx = int(m_pos / self.element_len)
+                # check whether the position of moment is beyond the range of beam
+                if m_pos > self.L or m_pos < 0:
+                    raise Warning("moment applied beyond the beam, ignored", m_pos)
+
+                # the moment is directly applied on nodes
+                elif m_pos in self.nodes:
+                    qt[2 * idx + 1] = m_val
+
+                # if the moment is not applied on nodes, computing its equivalent nodal force
+                else:
+                    pt, _ = LocalElement2D.equal_force(
+                        load,
+                        load_type,
+                        idx * self.element_len,
+                        self.element_len,
+                        load_angle
+                    )
+
+                    qt[2 * idx:2 * idx + 4] += pt[:,None]
+
+            else:
+                raise ValueError("pos_flag should be either 'idx' or 'pos'")
+
+        else:
+            raise ValueError("Type of load should be either 'q', 'F', 'M' ")
+
+        self.q[:self.num_nodes] += ql
+        self.q[self.num_nodes:] += qt
+
+
 if __name__ == "__main__":
     # Example of creating a Beam object and printing the global matrices
-    beam2D = Beam2D(length=3, young_module=1, area=1, density=1, moment_inertia=1, num_elements=3, angle= -0.25 * np.pi)
+    beam2D = Beam2D(length=3, young_module=1, area=1, density=1, moment_inertia=1, num_elements=3, angle= -0.5 * np.pi)
 
     # Print the global stiffness matrix
     print("the global stiffness matrix")
@@ -211,3 +320,11 @@ if __name__ == "__main__":
     print("the coordinates")
     coordinates = beam2D.get_node_pos()
     print(coordinates)
+
+    # beam2D.add_force((-1,100), LoadType.F, load_angle = np.pi/2, pos_flag = "idx")
+    # print(beam2D.q)
+    # beam2D.add_force((-1, 100), LoadType.M, load_angle = np.pi/2, pos_flag = "idx")
+    # print(beam2D.q)
+    beam2D.add_force(lambda x: uniform_load_function(x,value=-1), LoadType.q, load_angle= 0, pos_flag="idx")
+    beam2D.add_force(uniform_load_function, LoadType.q, load_angle= -np.pi/2, pos_flag="idx")
+    print(beam2D.q)

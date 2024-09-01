@@ -37,7 +37,7 @@ class FrameworkFEM:
     def __init__(self):
         # framework input properties
         self.beams = []  # List of Beam2D objects in the beam structure
-        self.connections = []  # List with connections between beams
+        self.connections = []  # List with connections between beams with (beam1, beam2, connected_node_pair(local idx), connect_type)
         self.constraints = []  # List to store applied constraints with (beam, node, value, constraint_Type)
         self.forces = []  # List to store applied forces with (beam_idx, force, force_type)
 
@@ -56,7 +56,7 @@ class FrameworkFEM:
         self._force_global = []  # List to store applied forces globally with (global_node_index, force, force_type)
         self.S_global = None  # Global stiffness Matrix for framework
         self.M_global = None  # Global stiffness Matrix for framework
-        self.q = None  # Initialize the global equivalent nodal force vector with zeros
+        self.q_global = None  # Initialize the global equivalent nodal force vector with zeros
         self.stsol = None  # Static solution vector (to be computed)
         self.dysol = None  # Dynamic solution vector (to be computed)
 
@@ -88,18 +88,24 @@ class FrameworkFEM:
         else:
             raise Exception("Cannot add connection after activating the FEM analysis")
 
-    def add_force(self, beam: Beam2D, load, load_type):
+    def add_force(self, beam: Beam2D, load, load_type, load_angle = np.pi/2):
         """
-        Add a force to the beam
+        Add a force to the beam, computing the equivalent nodal force vector for the loaded beam
 
         Parameters:
             beam (Beam2D): Beam2D object to which the force is applied
-            load (tuple): The load to apply. For point loads and moments, this is a tuple (node (local), magnitude).
+            load (tuple): The load to apply.
+                For point loads and moments, this is a tuple (node (local), magnitude).
                 For distributed loads, this is a function of position. Use `0` as the left end and `-1` as the last end.
+            load_angle (float): The angle to apply to the force.
             load_type (LoadType): The type of load, which can be a distributed load (q), point force (F), or moment (M).
         """
         if not self._activate:
             self.forces.append((beam, load, load_type))
+            # 这里调用了新的add_force方法，直接计算出该beam对应的q，存储在beam.q里
+            # 这个q会在之后active的时候，得到整个framework的q
+            # list存储的是引用，因此self.beams[idx].q 也会相应改变
+            beam.add_force(load,load_type,load_angle)
         else:
             raise Exception("Cannot add force after activating the FEM analysis")
 
@@ -177,14 +183,20 @@ class FrameworkFEM:
         Returns:
             dict: A dictionary where the keys are the node indices and the values are lists of the connected node
         """
+
         connection_pairs = {}
         for index, beam in enumerate(self.beams):
             connection_pairs[self.nodes[index][0]] = []
             connection_pairs[self.nodes[index][-1]] = []
+
         for connection in self._connections_global:
             node1, node2, connection_type = connection
-            connection_pairs[node1].append(node2)
-            connection_pairs[node2].append(node1)
+            try:
+                connection_pairs[node1].append(node2)
+                connection_pairs[node2].append(node1)
+            except KeyError:
+                raise ValueError(f"Failed to connect node {node2} and {node1}. "
+                                 f"Only beams' head or tail nodes can be connected.")
         return connection_pairs
 
     def _get_beam_from_node(self, node) -> Beam2D | None:
@@ -197,16 +209,19 @@ class FrameworkFEM:
         Returns:
             Beam2D: The Beam2D object corresponding to the node index
         """
-        for beam in self.beams:
-            if node in self.nodes[self.beams.index(beam)]:
-                return beam
+
+        # 这里我稍微改了一下逻辑，不用根据beam object来寻找它的index
+        # 反正都是遍历，这样应该会快一点
+        for beam_idx in range(len(self.beams)):
+            if node in self.nodes[beam_idx]:
+                return self.beams[beam_idx]
         return None
 
     def _generate_global_coordinates(self):
         """
         This function uses deep first search to generate the global coordinates for the framework.
         """
-        # initialize the global coordinates
+        # initialize the global coordinates & get connections between global nodes
         self.coordinates = [(0, 0)] * self.num_nodes
         adjacency_list = self.__generate_global_adjacency_connection_list()
         # beam is a dictionary, the key is the beam name, and the value is the set of two nodes that make up the beam
@@ -267,23 +282,10 @@ class FrameworkFEM:
     def _convert_global_force(self):
         """
         Converge the forces to the global index
+        倒也没有问题，只是我觉得可以先弄出beam的受力q，再叠加就好了
+        因此这里都删掉了，直接在assemble里面，把 concat q就好了
         """
-        for force in self.forces:
-            beam, load, load_type = force
-            global_nodes = self.nodes[self.beams.index(beam)]
-            if load_type == LoadType.F:
-                local_node, magnitude = load
-                node = global_nodes[local_node]
-                self._force_global.append((node, magnitude, load_type))
-            elif load_type == LoadType.M:
-                local_node, magnitude = load
-                node = global_nodes[local_node]
-                self._force_global.append((node, magnitude, load_type))
-            elif load_type == LoadType.q:
-                # TODO
-                pass
-            else:
-                raise Exception("Invalid load type")
+        pass
 
     def assemble_frame_matrices(self):
         if self._activate:
@@ -293,15 +295,19 @@ class FrameworkFEM:
         self.beams[0].assemble_matrices()
         S = self.beams[0].S
         M = self.beams[0].M
+        q = self.beams[0].q
         for beam2d in self.beams[1:]:
             beam2d.assemble_matrices()
             S = self.__extend_matrix(S, beam2d.S)
             M = self.__extend_matrix(M, beam2d.M)
+            q = np.concatenate((q, beam2d.q), axis=0)
 
         # Assemble the global constraints matrix by list
         C_list = []
+        a_list = []
 
         # add constraints for connection
+        # 这一段逻辑有点奇怪，之前我们把local转为了global，这里又转回去了，
         for connection in self._connections_global:
             node1, node2, connection_type = connection
             beam1 = self._get_beam_from_node(node1)
@@ -310,6 +316,7 @@ class FrameworkFEM:
             beam2_start = self.nodes[self.beams.index(beam2)][0]
             node1_local = node1 - beam1_start
             node2_local = node2 - beam2_start
+
             # cos(φ1) v1(L1, t) − sin(φ1) w1(L1, t) − cos(φ2) v2(0, t) + sin(φ2) w2(0, t) = 0
             c1 = np.zeros(S.shape[0])
             c1[3 * beam1_start + node1_local] = math.cos(beam1.angle)
@@ -317,6 +324,8 @@ class FrameworkFEM:
             c1[3 * beam2_start + node2_local] = -math.cos(beam2.angle)
             c1[3 * beam2_start + beam2.num_nodes + 2 * node2_local] = math.sin(beam2.angle)
             C_list.append(c1)
+            a_list.append(0)
+
             # sin(φ1) v1(L1, t) + cos(φ1) w1(L1, t) − sin(φ2) v2(0, t) − cos(φ2) w2(0, t) = 0
             c2 = np.zeros(S.shape[0])
             c2[3 * beam1_start + node1_local] = math.sin(beam1.angle)
@@ -324,12 +333,15 @@ class FrameworkFEM:
             c2[3 * beam2_start + node2_local] = -math.sin(beam2.angle)
             c2[3 * beam2_start + beam2.num_nodes + 2 * node2_local] = -math.cos(beam2.angle)
             C_list.append(c2)
+            a_list.append(0)
+
             if connection_type == ConnectionType.Fix:  # Fix connection，fixed angle
                 # w1′ (L1, t) − w2′ (0, t) = 0
                 c3 = np.zeros(S.shape[0])
-                c3[3 * beam1_start + 2 * beam1.num_nodes + 1] = 1
-                c3[3 * beam2_start + 2 * beam2.num_nodes + 1] = -1
+                c3[3 * beam1_start + beam1.num_nodes + 2 * node1_local + 1] = 1
+                c3[3 * beam2_start + beam2.num_nodes + 2 * node2_local + 1] = -1
                 C_list.append(c3)
+                a_list.append(0)
 
         # add boundary constraints
         for constraint in self._constraints_global:
@@ -337,42 +349,35 @@ class FrameworkFEM:
             beam = self._get_beam_from_node(node)
             beam_start = self.nodes[self.beams.index(beam)][0]
             node_local = node - beam_start
-            if constraint_type == ConstraintType.DISPLACEMENT:
-                # v1(0, t) = 0
+            if constraint_type == ConstraintType.AXIAL:
+                # v1(0, t) = value (usually 0)
                 c1 = np.zeros(S.shape[0])
                 c1[3 * beam_start + node_local] = 1
                 C_list.append(c1)
+                a_list.append(value)
+
+            elif constraint_type == ConstraintType.DISPLACEMENT:
                 # w1(0, t) = 0
                 c2 = np.zeros(S.shape[0])
                 c2[3 * beam_start + beam.num_nodes + 2 * node_local] = 1
                 C_list.append(c2)
+                a_list.append(value)
+
             elif constraint_type == ConstraintType.ROTATION:
                 # w1′ (0,t) = 0
                 c3 = np.zeros(S.shape[0])
                 c3[3 * beam_start + beam.num_nodes + 2 * node_local + 1] = 1
                 C_list.append(c3)
+                a_list.append(value)
 
         # extend the global matrix and add constraints matrix into global stiffness matrix
         self.S_global = self.__extend_matrix(S, np.zeros((len(C_list), len(C_list))))
         self.M_global = self.__extend_matrix(M, np.zeros((len(C_list), len(C_list))))
+        self.q_global = np.concatenate([q, np.array(a_list)[:,None]], axis=0)
+
         for i, c in enumerate(C_list):
             self.S_global[:len(c), S.shape[0] + i] = c[:]
             self.S_global[S.shape[0] + i, :len(c)] = c[:]
-
-        # apply the forces to the global equivalent nodal force vector
-        self.q = np.zeros(self.S_global.shape[0])
-        for force in self._force_global:
-            node, magnitude, load_type = force
-            beam = self._get_beam_from_node(node)
-            beam_start = self.nodes[self.beams.index(beam)][0]
-            node_local = node - beam_start
-            if load_type == LoadType.q:
-                raise Exception(
-                    "Distributed load not supported, please activate the FEM analysis before applying the load")
-            elif load_type == LoadType.F:
-                self.q[3 * beam_start + beam.num_nodes + 2 * node_local] += magnitude
-            elif load_type == LoadType.M:
-                self.q[3 * beam_start + beam.num_nodes + 2 * node_local + 1] += magnitude
 
     def __activate(self):
         """
@@ -403,13 +408,13 @@ class FrameworkFEM:
 
         if sol_type == SolvType.STATIC:
             # Static solution
-            self.stsol = np.linalg.solve(self.S_global, self.q)
+            self.stsol = np.linalg.solve(self.S_global, self.q_global)[:,0]
 
         elif sol_type == SolvType.DYNAMIC:
             # Dynamic solution using Newmark's method
             newmark_solver = NewMark(tau, num_steps, beta, gamma)
-            init_condis = np.zeros(self.q.shape)
-            self.dysol, _, _ = newmark_solver.solve(self.M_global, self.S_global, self.q, init_condis,
+            init_condis = np.zeros(self.q_global.shape)
+            self.dysol, _, _ = newmark_solver.solve(self.M_global, self.S_global, self.q_global, init_condis,
                                                     init_condis, init_condis)
         else:
             raise Exception("Wrong defined type of solution")
