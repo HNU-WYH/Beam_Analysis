@@ -3,6 +3,7 @@ import math
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import animation
+from sympy.physics.control.control_plots import matplotlib
 
 from src.beam import Beam2D
 from src.utils.local_matrix import LocalElement2D
@@ -373,7 +374,7 @@ class FrameworkFEM:
         # extend the global matrix and add constraints matrix into global stiffness matrix
         self.S_global = self.__extend_matrix(S, np.zeros((len(C_list), len(C_list))))
         self.M_global = self.__extend_matrix(M, np.zeros((len(C_list), len(C_list))))
-        self.q_global = np.concatenate([q, np.array(a_list)[:,None]], axis=0)
+        self.q_global = np.concatenate([q, np.array(a_list)])
 
         for i, c in enumerate(C_list):
             self.S_global[:len(c), S.shape[0] + i] = c[:]
@@ -408,7 +409,7 @@ class FrameworkFEM:
 
         if sol_type == SolvType.STATIC:
             # Static solution
-            self.stsol = np.linalg.solve(self.S_global, self.q_global)[:,0]
+            self.stsol = np.linalg.solve(self.S_global, self.q_global)
 
         elif sol_type == SolvType.DYNAMIC:
             # Dynamic solution using Newmark's method
@@ -416,6 +417,10 @@ class FrameworkFEM:
             init_condis = np.zeros(self.q_global.shape)
             self.dysol, _, _ = newmark_solver.solve(self.M_global, self.S_global, self.q_global, init_condis,
                                                     init_condis, init_condis)
+
+        elif sol_type == SolvType.EIGEN:
+            # Dynamic solution using Eigenvalue method without external forces
+            pass
         else:
             raise Exception("Wrong defined type of solution")
 
@@ -449,6 +454,8 @@ class FrameworkFEM:
             plt.show()
 
         elif sol_type == SolvType.DYNAMIC:
+            import matplotlib
+            matplotlib.use("WebAgg", force=True)
             x_d = np.zeros((len(x), self.dysol.shape[1]))
             y_d = np.zeros((len(y), self.dysol.shape[1]))
             for i in range(self.dysol.shape[1]):
@@ -490,6 +497,6 @@ class FrameworkFEM:
             ani = animation.FuncAnimation(fig, update, frames=self.dysol.shape[1], blit=True)
 
             # Save the animation as a GIF
-            # ani.save(r'..\output\dynamic_solution.gif', writer='imagemagick', fps=30)
+            ani.save(r'.\output\dynamic_solution2.gif', writer='imagemagick', fps=30)
 
             plt.show()

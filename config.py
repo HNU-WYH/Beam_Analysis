@@ -16,6 +16,7 @@ class ConstraintType(Enum):
 class SolvType(Enum):
     STATIC = "get the static and time-independent solution"
     DYNAMIC = "get the time-dependent solution"
+    EIGEN = "get the time-dependent solution based on eigenvalue method"
 
 class ConnectionType(Enum):
     Hinge = "Interconnection with changeable angle "

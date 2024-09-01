@@ -139,7 +139,7 @@ class Beam2D:
         self.assemble_matrices()
 
         # Intialize nodal force vector
-        self.q = np.zeros((3 * self.num_nodes, 1))
+        self.q = np.zeros((3 * self.num_nodes))
 
     def assemble_matrices(self):
         """
@@ -215,8 +215,8 @@ class Beam2D:
 
         """
         # Initialization
-        ql = np.zeros((self.num_nodes, 1))
-        qt = np.zeros((2 * self.num_nodes, 1))
+        ql = np.zeros((self.num_nodes))
+        qt = np.zeros((2 * self.num_nodes))
 
         if load_type == LoadType.q:
             # Apply distributed load over each element
@@ -229,8 +229,8 @@ class Beam2D:
                     load_angle
                 )
 
-                ql[idx: idx + 2] += pl[:,None]
-                qt[2 * idx:2 * idx + 4] += pt[:,None]
+                ql[idx: idx + 2] += pl
+                qt[2 * idx:2 * idx + 4] += pt
 
         elif load_type == LoadType.F:
             # Apply point force
@@ -260,8 +260,8 @@ class Beam2D:
                         load_angle
                     )
 
-                    ql[idx: idx + 2] += pl[:,None]
-                    qt[2 * idx:2 * idx + 4] += pt[:,None]
+                    ql[idx: idx + 2] += pl
+                    qt[2 * idx:2 * idx + 4] += pt
 
             else:
                 raise ValueError("pos_flag should be either 'idx' or 'pos'")
@@ -292,7 +292,7 @@ class Beam2D:
                         load_angle
                     )
 
-                    qt[2 * idx:2 * idx + 4] += pt[:,None]
+                    qt[2 * idx:2 * idx + 4] += pt
 
             else:
                 raise ValueError("pos_flag should be either 'idx' or 'pos'")
