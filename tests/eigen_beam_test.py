@@ -35,11 +35,11 @@ def test_dynamic_eigen():
     # Solve the dynamic system in fem method
     fem.solv(tau = 0.01, num_steps = 100, x0 = y0, dx0 = dy0, sol_type= SolvType.DYNAMIC)
     dysol1 = fem.dysol
-    dysol1_vis = dysol1.T[:,:N:2]
+    dysol1_vis = dysol1[:,:N:2]
 
 
     # Solve the dynamic system in eigen method
-    fem.solv(tau=0.01, num_steps=100, x0=y0, dx0=dy0, sol_type=SolvType.EIGEN)
+    fem.solv(tau=0.01, num_steps=100, x0 = y0, dx0 = dy0, sol_type=SolvType.EIGEN)
     dysol2 = fem.dysol
     dysol2_vis = dysol2[:,:N:2]
 

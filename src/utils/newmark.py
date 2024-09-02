@@ -112,4 +112,4 @@ class NewMark:
             u[:, j + 1] = u_star + self.beta * ddu[:, j + 1] * self.tau ** 2
             du[:, j + 1] = du_star + self.gamma * ddu[:, j + 1] * self.tau
 
-        return u, du, ddu
+        return u.T, du.T, ddu.T

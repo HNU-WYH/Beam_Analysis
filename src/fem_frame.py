@@ -6,6 +6,7 @@ from matplotlib import animation
 from sympy.physics.control.control_plots import matplotlib
 
 from src.beam import Beam2D
+from src.utils.eigs import EigenMethod
 from src.utils.local_matrix import LocalElement2D
 from src.utils.newmark import NewMark
 from config import LoadType, ConstraintType, SolvType, ConnectionType
@@ -403,7 +404,13 @@ class FrameworkFEM:
         self._generate_global_coordinates()
         self._convert_global_force()
 
-    def solv(self, num_steps=None, tau=None, sol_type=SolvType.STATIC, beta=0.25, gamma=0.5, y0 = 0, dy0 = 0):
+    def initial_acceleration(self, x0):
+        if np.isscalar(x0):
+            x0 = np.full(shape=self.q.shape, fill_value=x0)
+        ddx0 = np.linalg.solve(self.M, self.q - self.S @ x0 )
+        return ddx0
+
+    def solv(self, tau=None, num_steps=None, x0 = 0, dx0 = 0, sol_type=SolvType.STATIC, beta=0.25, gamma=0.5):
         """
         Solves the system of equations for the beam under the applied forces and constraints.
 
@@ -414,31 +421,45 @@ class FrameworkFEM:
             sol_type (SolvType): Type of solution, either static, dynamic or eigen
             beta (float): Beta parameter for Newmark's method
             gamma (float): Gamma parameter for Newmark's method
-            y0 (float): Initial position of the beam
-            dy0 (float): Initial velocity of the beam
+            x0 (float): Initial position of the beam
+            dx0 (float): Initial velocity of the beam
 
         Raises:
             Exception: If the solution type is incorrectly defined
         """
-        self.assemble_frame_matrices()
-
+        N, K = self.S.shape[0], self.S_global.shape[0] - self.S.shape[0]
 
         if sol_type == SolvType.STATIC:
             # Static solution
             self.stsol = np.linalg.solve(self.S_global, self.q_global)
 
-        elif sol_type == SolvType.DYNAMIC:
-            # Dynamic solution using Newmark's method
-            newmark_solver = NewMark(tau, num_steps, beta, gamma)
+        elif sol_type == SolvType.DYNAMIC or sol_type == SolvType.EIGEN:
+            # calculating the initial condition
+            if np.isscalar(x0) :
+                x0 = np.full(shape=self.q.shape, fill_value=x0)
+            if np.isscalar(dx0):
+                dx0 = np.full(shape=self.q.shape, fill_value=dx0)
 
+            if sol_type == SolvType.DYNAMIC:
+                # calculating the initial acceleration
+                ddx0 = self.initial_acceleration(x0)
 
+                # expand initial conditions
+                x0 = np.concatenate([x0, np.zeros(K)])
+                dx0 = np.concatenate([dx0, np.zeros(K)])
+                ddx0 = np.concatenate([ddx0, np.zeros(K)])
 
-            self.dysol, _, _ = newmark_solver.solve(self.M_global, self.S_global, self.q_global, y0, dy0, ddy0)
+                # Dynamic solution using Newmark's method
+                newmark_solver = NewMark(tau, num_steps, beta, gamma)
+                self.dysol, _, _ = newmark_solver.solve(self.M_global, self.S_global, self.q_global, x0, dx0, ddx0)
 
-        elif sol_type == SolvType.EIGEN:
-            # Dynamic solution using Eigenvalue method without external forces
+            else:
+                # Dynamic solution using Eigenvalue method without external forces
 
-            pass
+                eigen = EigenMethod(N, K)
+                res = eigen.solve(self.M_global, self.S_global, x0, dx0)
+                self.dysol = np.array([res(t) for t in np.arange(0, tau * num_steps, tau)])
+
         else:
             raise Exception("Wrong defined type of solution")
 
@@ -454,8 +475,7 @@ class FrameworkFEM:
                 nodes = self.nodes[self.beams.index(beam)]
                 beam_start = nodes[0]
                 nodes_local = [node - beam_start for node in nodes]
-                w = self.stsol[
-                    3 * beam_start + beam.num_nodes: 3 * beam_start + beam.num_nodes + 2 * nodes_local[-1] + 1: 2]
+                w = self.stsol[3 * beam_start + beam.num_nodes: 3 * beam_start + beam.num_nodes + 2 * nodes_local[-1] + 1: 2]
                 v = self.stsol[3 * beam_start: 3 * beam_start + nodes_local[-1] + 1]
                 # x = x0 + w * sin(angle) - v * cos(angle)
                 x_st[nodes[0]:nodes[-1] + 1] += np.sin(angle) * w - np.cos(angle) * v
