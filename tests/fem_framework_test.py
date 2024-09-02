@@ -77,7 +77,7 @@ class TestCasesForFramework(unittest.TestCase):
         frame_work.add_connection(beam_2, beam_3, (-1, 0), ConnectionType.Fix)
 
         # Apply a force of 50 at position -1 (node) (the right end of beam_1)
-        frame_work.add_force(beam_1, (-1, 500000), LoadType.F, load_angle = np.pi/2)
+        frame_work.add_force(beam_2, (0, 500000), LoadType.F, load_angle = 0)
 
         # Add constraints
         frame_work.add_constraint(beam_1, 0, 0, ConstraintType.DISPLACEMENT)
@@ -100,7 +100,7 @@ class TestCasesForFramework(unittest.TestCase):
     def Single_beam(self):
         # Initialize two simple beam with 50 nodes and length 5.0
         length = 3.0
-        num_elements = 3
+        num_elements = 30
         E, I, rho, A = 210 * 10 ** 9, 1 * 10 ** (-6), 7800, 10 ** (-4)
 
         # Initialize the beam
@@ -113,7 +113,7 @@ class TestCasesForFramework(unittest.TestCase):
         frame_work.add_beam(beam_1)
 
         # Apply a force of 50 at position -1 (node) (the right end of beam_1)
-        frame_work.add_force(beam_1, (-1, 500000), LoadType.F, load_angle= 0)
+        frame_work.add_force(beam_1, (-1, 500000), LoadType.F, load_angle= np.pi/4)
 
         # Add constraints
         frame_work.add_constraint(beam_1, 0, 0, ConstraintType.DISPLACEMENT)
@@ -154,6 +154,7 @@ class TestCasesForFramework(unittest.TestCase):
         # Add constraints
         frame_work.add_constraint(beam_1, 0, 0, ConstraintType.DISPLACEMENT)
         frame_work.add_constraint(beam_1, 0, 0, ConstraintType.ROTATION)
+        frame_work.add_constraint(beam_1, 0, 0, ConstraintType.AXIAL)
 
         # assemble the global matrices
         frame_work.assemble_frame_matrices()
