@@ -35,8 +35,10 @@ class TestCasesForFramework(unittest.TestCase):
 
         # Add constraints
         frame_work.add_constraint(beam_1, 0, 0, ConstraintType.DISPLACEMENT)
+        frame_work.add_constraint(beam_1, 0, 0, ConstraintType.AXIAL)
         frame_work.add_constraint(beam_1, 0, 0, ConstraintType.ROTATION)
         frame_work.add_constraint(beam_2, -1, 0, ConstraintType.DISPLACEMENT)
+        frame_work.add_constraint(beam_2, -1, 0, ConstraintType.AXIAL)
 
         # assemble the global matrices
         frame_work.assemble_frame_matrices()
@@ -54,7 +56,7 @@ class TestCasesForFramework(unittest.TestCase):
     def portal_frame_test(self):
         # Initialize two simple beam with 50 nodes and length 5.0
         length = 3.0
-        num_elements = 3
+        num_elements = 30
         E, I, rho, A = 210 * 10 ** 9, 1 * 10 ** (-6), 7800, 10 ** (-4)
 
         # Initialize the beam
@@ -91,6 +93,7 @@ class TestCasesForFramework(unittest.TestCase):
 
         # Solve the static system
         frame_work.solv()
+        frame_work.solv(num_steps=200, tau=0.01, sol_type=SolvType.DYNAMIC)
 
         frame_work.visualize()
 
