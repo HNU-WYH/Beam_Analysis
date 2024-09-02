@@ -492,6 +492,7 @@ class FrameworkFEM:
             plt.show()
 
         elif sol_type == SolvType.DYNAMIC:
+            self.dysol = self.dysol.T
             import matplotlib
             matplotlib.use("WebAgg", force=True)
             x_d = np.zeros((len(x), self.dysol.shape[1]))
