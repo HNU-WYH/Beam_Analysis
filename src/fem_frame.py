@@ -48,6 +48,12 @@ class FrameworkFEM:
         self.num_nodes = 0
         self.num_elements = 0
 
+        # Properties for FEM preprocessing
+        self.S = None
+        self.M = None
+        self.q = None
+        self.ddy0 = None
+
         # properties for FEM analysis
         self._activate = False  # flag to activate the FEM analysis
         self._connections_global = []  # List with connections between beams with (global_node_index1,
@@ -292,6 +298,7 @@ class FrameworkFEM:
         if self._activate:
             return
         self.__activate()
+
         # Assemble the global mass and stiffness matrices for the framework
         self.beams[0].assemble_matrices()
         S = self.beams[0].S
@@ -371,6 +378,11 @@ class FrameworkFEM:
                 C_list.append(c3)
                 a_list.append(value)
 
+        # get the matrices before add constraints & forces
+        self.S = S
+        self.M = M
+        self.q = q
+
         # extend the global matrix and add constraints matrix into global stiffness matrix
         self.S_global = self.__extend_matrix(S, np.zeros((len(C_list), len(C_list))))
         self.M_global = self.__extend_matrix(M, np.zeros((len(C_list), len(C_list))))
@@ -391,21 +403,25 @@ class FrameworkFEM:
         self._generate_global_coordinates()
         self._convert_global_force()
 
-    def solv(self, num_steps=None, tau=None, sol_type=SolvType.STATIC, beta=0.25, gamma=0.5):
+    def solv(self, num_steps=None, tau=None, sol_type=SolvType.STATIC, beta=0.25, gamma=0.5, y0 = 0, dy0 = 0):
         """
         Solves the system of equations for the beam under the applied forces and constraints.
+
 
         Parameters:
             num_steps (int): Number of time steps for dynamic solution
             tau (float): Time step for dynamic solution
-            sol_type (SolvType): Type of solution, either static or dynamic
+            sol_type (SolvType): Type of solution, either static, dynamic or eigen
             beta (float): Beta parameter for Newmark's method
             gamma (float): Gamma parameter for Newmark's method
+            y0 (float): Initial position of the beam
+            dy0 (float): Initial velocity of the beam
 
         Raises:
             Exception: If the solution type is incorrectly defined
         """
         self.assemble_frame_matrices()
+
 
         if sol_type == SolvType.STATIC:
             # Static solution
@@ -414,12 +430,14 @@ class FrameworkFEM:
         elif sol_type == SolvType.DYNAMIC:
             # Dynamic solution using Newmark's method
             newmark_solver = NewMark(tau, num_steps, beta, gamma)
-            init_condis = np.zeros(self.q_global.shape)
-            self.dysol, _, _ = newmark_solver.solve(self.M_global, self.S_global, self.q_global, init_condis,
-                                                    init_condis, init_condis)
+
+
+
+            self.dysol, _, _ = newmark_solver.solve(self.M_global, self.S_global, self.q_global, y0, dy0, ddy0)
 
         elif sol_type == SolvType.EIGEN:
             # Dynamic solution using Eigenvalue method without external forces
+
             pass
         else:
             raise Exception("Wrong defined type of solution")

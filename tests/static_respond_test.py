@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 from src.beam import Beam
-from src.fem import FEM, LoadType, ConstraintType, SolvType
+from src.fem_beam import FEM, LoadType, ConstraintType, SolvType
 
 
 def test_static_fem():

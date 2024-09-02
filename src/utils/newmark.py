@@ -79,7 +79,7 @@ class NewMark:
         """
 
         # Initialize
-        num_dofs = x.shape[0]
+        num_dofs = M.shape[0]
         u = np.zeros([num_dofs, self.num_steps])
         du = np.zeros([num_dofs, self.num_steps])
         ddu = np.zeros([num_dofs, self.num_steps])

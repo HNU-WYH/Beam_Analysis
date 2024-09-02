@@ -1,5 +1,5 @@
 from src.beam import Beam
-from src.fem import FEM
+from src.fem_beam import FEM
 from src.utils.local_matrix import LocalElement
 from src.utils.local_matrix import LoadType
 from config import uniform_load_function, partial_uniform_load_function, triangular_load_function

@@ -1,5 +1,6 @@
 import numpy as np
 from src.beam import Beam
+from src.utils.eigs import EigenMethod
 
 from src.utils.local_matrix import LocalElement
 from src.utils.newmark import NewMark
@@ -22,6 +23,8 @@ class FEM:
         beam (Beam): The beam object in preprocessing steps, imported from beam.py
         constraints (list): A list of constraints applied to the beam.
         q (np.ndarray): The equivalent global nodal force vector, representing applied loads.
+        new_q (np.ndarray): The global equivalent nodal force vector with constraints, namely [q,a].
+
     """
     def __init__(self, beam: Beam):
         """
@@ -37,6 +40,8 @@ class FEM:
         self.beam = beam                        # Beam object containing the beam structure
         self.constraints = []                   # List to store applied constraints
         self.q = np.zeros(2 * beam.num_nodes)   # Initialize the global equivalent nodal force vector with zeros
+        self.new_q = None                       # The global equivalent nodal force vector with constraints
+        self._activate = False                  # whether the constraints has been added to the stiffness matrix
 
     def apply_force(self, load, load_type):
         """
@@ -72,7 +77,6 @@ class FEM:
 
             # if the force is not applied on nodes, computing its equivalent nodal force
             else:
-
                 self.q[2 * idx:2 * idx + 4] += LocalElement.equal_force(
                     load,
                     load_type,
@@ -153,7 +157,13 @@ class FEM:
             else:
                 Warning("wrong type of constraint", constraint_type)
 
-    def solv(self, num_steps=None, tau=None, sol_type=SolvType.STATIC, beta=0.25, gamma=0.5):
+    def initial_acceleration(self, x0 = 0):
+        if np.isscalar(x0):
+            x0 = np.full(shape=self.q.shape, fill_value=x0)
+        ddx0 = np.linalg.solve(self.beam.M, self.q - self.beam.S @ x0 )
+        return ddx0
+
+    def solv(self, tau=None, num_steps=None, x0 = 0, dx0 = 0, sol_type=SolvType.STATIC,  beta=0.25, gamma=0.5):
         """
         Solves the system of equations for the beam under the applied forces and constraints.
 
@@ -167,16 +177,39 @@ class FEM:
         Raises:
             Exception: If the solution type is incorrectly defined.
         """
-        self._apply_constraint()  # Apply constraints to the global matrices
+        if not self._activate:
+            self._activate = True
+            self._apply_constraint()  # Apply constraints to the global matrices
 
         if sol_type == SolvType.STATIC:
             # Static solution
             self.stsol = np.linalg.solve(self.S, self.new_q)
 
-        elif sol_type == SolvType.DYNAMIC:
-            # Dynamic solution using Newmark's method
-            newmark_solver = NewMark(tau, num_steps, beta, gamma)
-            init_condis = np.zeros(self.new_q.shape)
-            self.dysol, _, _ = newmark_solver.solve(self.M, self.S, self.new_q, init_condis, init_condis, init_condis)
+        elif sol_type == SolvType.DYNAMIC or sol_type == SolvType.EIGEN:
+            # calculating the initial condition
+            if np.isscalar(x0) :
+                x0 = np.full(shape=self.q.shape, fill_value=x0)
+            if np.isscalar(dx0):
+                dx0 = np.full(shape=self.q.shape, fill_value=dx0)
+
+            if sol_type == SolvType.DYNAMIC:
+                # calculating the initial acceleration
+                ddx0 = self.initial_acceleration(x0)
+
+                # expand initial conditions
+                x0 = np.concatenate([x0,np.zeros(len(self.constraints))])
+                dx0 = np.concatenate([dx0,np.zeros(len(self.constraints))])
+                ddx0 = np.concatenate([ddx0,np.zeros(len(self.constraints))])
+
+                # Dynamic solution using Newmark's method
+                newmark_solver = NewMark(tau, num_steps, beta, gamma)
+                self.dysol, _, _ = newmark_solver.solve(self.M, self.S, self.new_q, x0, dx0, ddx0)
+
+            else:
+                N, K = self.beam.S.shape[0], len(self.constraints)
+                eigen = EigenMethod(N, K)
+                res = eigen.solve(self.M, self.S, x0, dx0) # a function that require t and return the result in t
+                self.dysol = np.array([res(t) for t in np.arange(0, tau * num_steps, tau)])
+
         else:
             raise Exception("Wrong defined type of solution")
