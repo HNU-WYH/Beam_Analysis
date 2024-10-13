@@ -1,4 +1,8 @@
 import numpy as np
+from matplotlib import animation
+import matplotlib.pyplot as plt
+import matplotlib
+
 from src.beam import Beam
 from src.utils.eigs import EigenMethod
 
@@ -6,6 +10,7 @@ from src.utils.local_matrix import LocalElement
 from src.utils.newmark import NewMark
 from config import LoadType, ConstraintType, SolvType
 
+matplotlib.use('webagg')
 
 class FEM:
     """
@@ -213,3 +218,60 @@ class FEM:
 
         else:
             raise Exception("Wrong defined type of solution")
+
+    def visualize(self, sol_type=SolvType.STATIC, granularity = 100, title='Displacement', written = False):
+        """
+        Visualizes the displacement of the beam.
+
+        Parameters:
+            sol_type (SolvType): Type of solution, either STATIC, DYNAMIC, or EIGEN.
+            title (str): Title for the plot or animation.
+            granularity: The number of interpolation points on the solution
+            written: The flag determining whether we plot the figure
+        """
+        x_values = np.linspace(0, self.beam.L, granularity)
+
+        if sol_type == SolvType.STATIC:
+            # Static solution - plot a static graph
+            y_values = [LocalElement.app_func(x, self.stsol, [0, self.beam.L], self.beam.num_elements) for x in x_values]
+
+            plt.figure()
+            plt.plot(x_values, y_values, label='Static Displacement')
+            plt.xlabel('Position along the beam (x)')
+            plt.ylabel('Displacement')
+            plt.title(title)
+            plt.legend()
+            plt.grid(True)
+            plt.show()
+
+        elif sol_type in [SolvType.DYNAMIC, SolvType.EIGEN]:
+            # Dynamic solution - create an animation
+            fig, ax = plt.subplots()
+            line, = ax.plot([], [], 'r-', label='Dynamic Solution')
+
+            # Create a figure and axis for the animation
+            y_static = [LocalElement.app_func(x, self.stsol, [0, self.beam.L], self.beam.num_elements)
+                        for x in x_values]
+
+            ax.plot(x_values, y_static, 'b-', label='Static Solution')
+            ax.set_xlim(0, self.beam.L)
+            ax.set_ylim(min(np.min(self.dysol[:,:2 * (self.beam.num_elements + 1)]),
+                            np.min(self.stsol[:2 * (self.beam.num_elements + 1)])),
+                        max(np.max(self.dysol[:,:2 * (self.beam.num_elements + 1)]),
+                            np.max(self.stsol[:2 * (self.beam.num_elements + 1)])))
+            ax.set_xlabel('Position along the beam (x)')
+            ax.set_ylabel('Displacement')
+            ax.set_title('Dynamic Solution Over Time')
+            ax.legend(loc="upper left")
+
+            def update(frame):
+                y_dynamic = [LocalElement.app_func(x, self.dysol[frame], [0, self.beam.L], self.beam.num_elements) for x in x_values]
+                line.set_data(x_values, y_dynamic)
+                return line,
+
+            ani = animation.FuncAnimation(fig, update, frames=self.dysol.shape[0], blit=True)
+
+            if written:
+                ani.save(r'../output/fem_static_dynamic_solution.gif', writer='imagemagick', fps=30)
+
+            plt.show()
