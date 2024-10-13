@@ -10,8 +10,6 @@ from src.utils.local_matrix import LocalElement
 from src.utils.newmark import NewMark
 from config import LoadType, ConstraintType, SolvType
 
-matplotlib.use('webagg')
-
 class FEM:
     """
     This class represents the postprocessing of a beam structure, including applying forces, applying constraints,
@@ -219,6 +217,11 @@ class FEM:
         else:
             raise Exception("Wrong defined type of solution")
 
+    def assess_dis(self, coefficient, x_values):
+        y_values = [LocalElement.app_func(x, coefficient, [0, self.beam.L], self.beam.num_elements) for x in x_values]
+        return y_values
+
+
     def visualize(self, sol_type=SolvType.STATIC, granularity = 100, title='Displacement', written = False):
         """
         Visualizes the displacement of the beam.
@@ -229,11 +232,12 @@ class FEM:
             granularity: The number of interpolation points on the solution
             written: The flag determining whether we plot the figure
         """
+        matplotlib.use('webagg')
         x_values = np.linspace(0, self.beam.L, granularity)
 
         if sol_type == SolvType.STATIC:
             # Static solution - plot a static graph
-            y_values = [LocalElement.app_func(x, self.stsol, [0, self.beam.L], self.beam.num_elements) for x in x_values]
+            y_values = self.assess_dis(self.stsol, x_values)
 
             plt.figure()
             plt.plot(x_values, y_values, label='Static Displacement')
@@ -250,8 +254,7 @@ class FEM:
             line, = ax.plot([], [], 'r-', label='Dynamic Solution')
 
             # Create a figure and axis for the animation
-            y_static = [LocalElement.app_func(x, self.stsol, [0, self.beam.L], self.beam.num_elements)
-                        for x in x_values]
+            y_static = self.assess_dis(self.stsol, x_values)
 
             ax.plot(x_values, y_static, 'b-', label='Static Solution')
             ax.set_xlim(0, self.beam.L)
@@ -265,7 +268,7 @@ class FEM:
             ax.legend(loc="upper left")
 
             def update(frame):
-                y_dynamic = [LocalElement.app_func(x, self.dysol[frame], [0, self.beam.L], self.beam.num_elements) for x in x_values]
+                y_dynamic = self.assess_dis(self.dysol[frame], x_values)
                 line.set_data(x_values, y_dynamic)
                 return line,
 
