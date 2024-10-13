@@ -65,7 +65,7 @@ def test_dynamic_eigen():
     ani = animation.FuncAnimation(fig, update, frames=min(dysol1_vis.shape[0], dysol2_vis.shape[0]), blit=True, repeat=False)
 
     # Save the animation as a GIF (optional)
-    ani.save(r'..\output\eigen_vs_fem_solution3.gif', writer='imagemagick', fps=30)
+    # ani.save(r'..\output\eigen_vs_fem_solution3.gif', writer='imagemagick', fps=30)
 
     # Display the animation
     plt.show()
