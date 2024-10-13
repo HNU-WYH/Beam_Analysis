@@ -463,7 +463,7 @@ class FrameworkFEM:
         else:
             raise Exception("Wrong defined type of solution")
 
-    def visualize(self, sol_type=SolvType.STATIC):
+    def visualize(self, sol_type=SolvType.STATIC, title: str = 'Deformed Structure'):
         x = [coord[0] for coord in self.coordinates]
         y = [coord[1] for coord in self.coordinates]
 
@@ -485,13 +485,13 @@ class FrameworkFEM:
             # plot the original beam (self.coordinates) and the static deformed beam (x, y)
             plt.plot(x, y, 'b-', label='Original Beam')
             plt.plot(x_st, y_st, 'r-', label='Deformed Beam')
-            plt.xlabel('x')
-            plt.ylabel('y')
-            plt.title('Deformed Beam')
+            plt.xlabel('x (m)')
+            plt.ylabel('y (m)')
+            plt.title(title)
             plt.legend()
             plt.show()
 
-        elif sol_type == SolvType.DYNAMIC:
+        elif sol_type == SolvType.DYNAMIC or sol_type == SolvType.EIGEN:
             self.dysol = self.dysol.T
             import matplotlib
             matplotlib.use("WebAgg", force=True)
@@ -512,6 +512,9 @@ class FrameworkFEM:
                 dx_d = np.sin(angle) * w_d - np.cos(angle) * v_d
                 # y = y0 - w * cos(angle) - v * sin(angle)
                 dy_d = -np.cos(angle) * w_d - np.sin(angle) * v_d
+                # transform the complex values to real values
+                dx_d = np.real(dx_d)
+                dy_d = np.real(dy_d)
                 x_d[nodes[0]:nodes[-1] + 1,] += dx_d[:,]
                 y_d[nodes[0]:nodes[-1] + 1,] += dy_d[:,]
 
@@ -524,7 +527,7 @@ class FrameworkFEM:
             ax.set_ylim(np.min(y_d), np.max(y_d))
             ax.set_xlabel('x')
             ax.set_ylabel('y')
-            ax.set_title('Dynamic Solution Over Time')
+            ax.set_title(title)
             ax.legend(loc="upper left")
 
             # Update function for animation
