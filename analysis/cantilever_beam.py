@@ -158,7 +158,7 @@ def cantilever_beam(load_type, solv_type = SolvType.STATIC):
         for tau in [0.001]:
             for num_elements in [1, 5, 50]:
                 # # compare with EIgen value method & FEM method
-                # matplotlib.use("WebAgg", force=True)
+                matplotlib.use("WebAgg", force=True)
 
                 # Initialize the beam
                 beam = Beam(length, E, rho, I, num_elements)
@@ -217,4 +217,6 @@ def cantilever_beam(load_type, solv_type = SolvType.STATIC):
 
 if __name__ == "__main__":
     # Run the test
+    cantilever_beam(LoadType.F)
+    cantilever_beam(LoadType.q)
     cantilever_beam(None, SolvType.DYNAMIC)
