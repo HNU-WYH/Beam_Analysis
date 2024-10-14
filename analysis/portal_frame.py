@@ -57,7 +57,7 @@ def activate(frame_work: FrameworkFEM, sol_type: SolvType = SolvType.DYNAMIC, x0
     frame_work.solv()
 
     # Solve the dynamic system
-    frame_work.solv(tau=0.1, num_steps=200, sol_type=sol_type, x0 = x0, dx0 = dx0)
+    frame_work.solv(tau=0.001, num_steps=200, sol_type=sol_type, x0 = x0, dx0 = dx0)
 
     # Visualize the solution
     frame_work.visualize(title=title)
@@ -85,7 +85,7 @@ class fix_joint(unittest.TestCase):
         frame_work, beam_1, beam_2, beam_3 = get_beam()
         add_connection(frame_work, beam_1, beam_2, beam_3, 'fix')
         add_constraint(frame_work, beam_1, beam_2, beam_3)
-        activate(frame_work, sol_type=SolvType.EIGEN, x0=0.1, dx0=0, title='Fix Joint Free Vibration')
+        activate(frame_work, sol_type=SolvType.DYNAMIC, x0=0.1, dx0=0, title='Fix Joint Free Vibration')
 
 class hinged_joint(unittest.TestCase):
 

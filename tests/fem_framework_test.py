@@ -95,7 +95,9 @@ class TestCasesForFramework(unittest.TestCase):
         frame_work.solv()
         frame_work.solv(tau=0.1, num_steps=200, sol_type=SolvType.DYNAMIC)
 
-        frame_work.visualize()
+        frame_work.visualize(SolvType.DYNAMIC)
+
+
 
     def Single_beam(self):
         # Initialize two simple beam with 50 nodes and length 5.0

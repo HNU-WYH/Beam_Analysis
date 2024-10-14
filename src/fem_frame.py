@@ -538,7 +538,9 @@ class FrameworkFEM:
             # Create animation
             ani = animation.FuncAnimation(fig, update, frames=self.dysol.shape[1], blit=True)
 
+
             # Save the animation as a GIF
-            ani.save(r'.\output\dynamic_solution2.gif', writer='imagemagick', fps=30)
+            ani.save(r'..\output\dynamic_solution2.gif', writer='imagemagick', fps=30)
 
             plt.show()
+
