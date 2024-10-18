@@ -2,111 +2,97 @@
 
 ## Overview
 
-This project aims to analyze the behavior of a cantilever beam using the Finite Element Method (FEM). The project includes both static and dynamic analyses, and generates visualizations of the beam's behavior under various loading conditions.
-
-## Project Structure
-
-```
-Beam_Analysis/
-├── input/
-│   ├── structure_data/
-│   └── material_data/
-├── src/
-│   ├── __init__.py
-│   ├── fem.py
-│   ├── beam.py
-│   ├── visualization.py
-│   ├── utils.py
-│   └── main.py
-├── tests/
-│   ├── test_fem.py
-│   ├── test_beam.py
-│   ├── test_visualization.py
-│   └── test_utils.py
-├── output/
-├── requirements.txt
-└── README.md
-```
+This project aims to analyze the behavior of a cantilever beam using the Finite Element Method (FEM). The project
+includes both static and dynamic analyses, and generates visualizations of the beam's behavior under various loading
+conditions.
 
 ## Getting Started
 
 ### Prerequisites
 
-Ensure you have Python 3.x and Anaconda installed. You can check your Python version using:
+Make sure your environment have Python 3.6 or higher and install the required packages:
 
 ```sh
-python --version
+pip install -r requirements.txt
 ```
 
-### Installation
+The required packages:
 
-1. Clone the repository:
+- numpy
+- matplotlib
+- scipy
+- sympy
+- pandas
+- pyparsing
+- fonttools
 
-```sh
-git clone https://github.com/HNU-WYH/Beam_Analysis
-cd Beam_Analysis
+You can download the release from [HERE](https://github.com/HNU-WYH/Beam_Analysis/releases/).
+
+## Usage(Example)
+
+Here we provide an example of a portal frame consisting of three beams. The first beam is fixed at the left end, and the
+third beam is fixed at the right end. The second beam is connected to the first and third beams at the left and right
+ends, respectively. A concentrated force of 1,000,000 N is applied to the right end of the first beam. The beams are
+made of steel with the following properties: E = 210 GPa, A = 5383 mm^2, I = 36.92 mm^4, and ρ = 42.3 kN/m^3. The length
+of each beam is 5 m, and each beam is discretized into 100 elements. The first beam is oriented vertically, the second
+beam is horizontal, and the third beam is oriented vertically in the opposite direction. The static and dynamic
+responses of the portal frame are analyzed. The graph shown as below:
+
+![static](example.png)
+
+```python
+import math
+
+from config import LoadType, ConstraintType, SolvType, ConnectionType
+from src.beam import Beam2D
+from src.fem_frame import FrameworkFEM
+
+# Initialize the basic parameters of the beam
+length = 5.0
+num_elements = 100
+E = 210 * 10 ** 9
+I = 36.92 * 10 ** (-6)
+rho = 42.3
+A = 5383 * 10 ** (-6)
+
+# Initialize the beam
+beam_1 = Beam2D(length, E, A, rho, I, num_elements, angle=math.pi / 2)
+beam_2 = Beam2D(length, E, A, rho, I, num_elements)
+beam_3 = Beam2D(length, E, A, rho, I, num_elements, angle=-math.pi / 2)
+
+# Initialize FEM Framework model
+frame_work = FrameworkFEM()
+
+# Add beams to the framework
+frame_work.add_beam(beam_1)
+frame_work.add_beam(beam_2)
+frame_work.add_beam(beam_3)
+
+# Add connections between beams
+frame_work.add_connection(beam_1, beam_2, (-1, 0), ConnectionType.Fix)
+frame_work.add_connection(beam_2, beam_3, (-1, 0), ConnectionType.Fix)
+
+# Add constraints
+frame_work.add_constraint(beam_1, 0, 0, ConstraintType.DISPLACEMENT)
+frame_work.add_constraint(beam_1, 0, 0, ConstraintType.AXIAL)
+frame_work.add_constraint(beam_1, 0, 0, ConstraintType.ROTATION)
+frame_work.add_constraint(beam_3, -1, 0, ConstraintType.DISPLACEMENT)
+frame_work.add_constraint(beam_3, -1, 0, ConstraintType.AXIAL)
+frame_work.add_constraint(beam_3, -1, 0, ConstraintType.ROTATION)
+
+# Add forces
+frame_work.add_force(beam_1, (-1, 1000000), LoadType.F)
+
+# assemble the global matrices
+frame_work.assemble_frame_matrices()
+
+# Solve the static system
+frame_work.solv()
+
+# Solve the dynamic system
+frame_work.solv(tau=0.1, num_steps=200, sol_type=SolvType.DYNAMIC)
+
+# Visualize the solution
+frame_work.visualize()
+frame_work.visualize(sol_type=SolvType.DYNAMIC)
 ```
-
-2. Create a virtual environment and install the required packages:
-
-```sh
-conda create --name <env_name> --file requirement.txt
-```
-
-3. activate the created environment:
-
-```sh
-activate <env_name>
-```
-
-## Usage
-
-### Running the Analysis
-
-The main script to run the analysis is `main.py`. You can execute it using:
-
-```sh
-python src/main.py
-```
-
-This script will:
-
-- Define the beam properties and discretize it.
-- Assemble the FEM matrices.
-- Apply loads and boundary conditions.
-- Solve both static and dynamic problems.
-- Generate visualizations of the results.
-
-### Project Modules
-
-- **fem.py**: Contains the `FEM` class for assembling matrices, applying boundary conditions, and solving the equations.
-- **beam.py**: Contains the `Beam` class for defining beam properties and discretizing it.
-- **visualization.py**: Contains the `Visualization` class for plotting static and dynamic results.
-- **utils.py**: Contains utility functions for creating load vectors and boundary conditions.
-- **main.py**: The main script that orchestrates the entire process.
-
-### Testing
-
-Tests are located in the `tests/` directory. To run the tests, you can use:
-
-```sh
-pytest tests/
-```
-
-This will execute all the test cases to ensure the code is working as expected.
-
-## Example
-
-Here is an example of how to define a beam, apply loads, and visualize the results:
-
-```
-# Comming soon
-```
-
-## Contributing
-
-Contributions are welcome! Please fork the repository and submit a pull request for review.
-
-## License
-
-This project is licensed under the MIT License. See the LICENSE file for details.
