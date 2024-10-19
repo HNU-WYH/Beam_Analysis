@@ -3,11 +3,9 @@ import math
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import animation
-from sympy.physics.control.control_plots import matplotlib
 
 from src.beam import Beam2D
 from src.utils.eigs import EigenMethod
-from src.utils.local_matrix import LocalElement2D
 from src.utils.newmark import NewMark
 from config import LoadType, ConstraintType, SolvType, ConnectionType
 
