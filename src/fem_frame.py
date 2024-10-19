@@ -163,7 +163,7 @@ class FrameworkFEM:
             self.num_nodes += self.beams[i].num_nodes
             self.num_elements += self.beams[i].num_elements
 
-    def __generate_local_coordinates(self, initial_position, beam: Beam2D):
+    def __generate_local_coordinates(self, initial_position, beam: Beam2D, reverse: bool):
         """
         Generate the local coordinates for the beam
         The local coordinates are a list of tuples, where each tuple contains the x and y coordinates of the corresponding node.
@@ -172,16 +172,25 @@ class FrameworkFEM:
         Parameters:
             initial_position (tuple): The initial position of the beam in the global coordinate system
             beam (Beam2D): The Beam2D object for which to generate the local coordinates
+            reverse (bool): A flag to indicate whether to generate the local coordinates in reverse order
         """
         x0, y0 = initial_position
         angle = beam.angle
         local_coordinates = []
         nodes = self.nodes[self.beams.index(beam)]
         unit_length = beam.element_len
-        for node in range(beam.num_nodes):
-            x_new = x0 + node * unit_length * np.cos(angle)
-            y_new = y0 + node * unit_length * np.sin(angle)
-            local_coordinates.append((x_new, y_new))
+        if not reverse:
+            for node in range(beam.num_nodes):
+                x_new = x0 + node * unit_length * np.cos(angle)
+                y_new = y0 + node * unit_length * np.sin(angle)
+                local_coordinates.append((x_new, y_new))
+        else:
+            # inverse the direction, from right to left
+            for node in range(beam.num_nodes):
+                x_new = x0 - node * unit_length * np.cos(angle)
+                y_new = y0 - node * unit_length * np.sin(angle)
+                local_coordinates.append((x_new, y_new))
+            local_coordinates.reverse()
         self.coordinates[nodes[0]:nodes[-1] + 1] = local_coordinates
 
     def __generate_global_adjacency_connection_list(self):
@@ -260,11 +269,12 @@ class FrameworkFEM:
                     if new_beam is None:
                         raise Exception("Invalid connection")
                     if new_beam not in visited_beams:
-                        self.__generate_local_coordinates(self.coordinates[node], new_beam)
+                        is_reverse = False if connected_node == self.nodes[self.beams.index(new_beam)][0] else True
+                        self.__generate_local_coordinates(self.coordinates[node], new_beam, is_reverse)
                         dfs(new_beam)
 
         # 从起始beam开始遍历
-        self.__generate_local_coordinates((0, 0), self.beams[0])
+        self.__generate_local_coordinates((0, 0), self.beams[0], False)
         dfs(self.beams[0])
 
     @staticmethod
