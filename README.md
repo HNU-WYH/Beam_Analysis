@@ -41,8 +41,7 @@ direction. The static and dynamic response of the portal frame was analysed. The
 ```python
 import math
 
-from src import *
-from config import *
+from beam_analysis import *
 
 # Initialize the basic parameters of the beam
 length = 5.0
