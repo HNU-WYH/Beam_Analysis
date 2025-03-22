@@ -1,4 +1,5 @@
 import math
+import os
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -471,7 +472,7 @@ class FrameworkFEM:
         else:
             raise Exception("Wrong defined type of solution")
 
-    def visualize(self, sol_type=SolvType.STATIC, title: str = 'Deformed Structure'):
+    def visualize(self, sol_type=SolvType.STATIC, title: str = 'Deformed Structure', save_flag = False):
         x = [coord[0] for coord in self.coordinates]
         y = [coord[1] for coord in self.coordinates]
 
@@ -548,7 +549,9 @@ class FrameworkFEM:
 
 
             # Save the animation as a GIF
-            ani.save(r'..\output\dynamic_solution2.gif', writer='imagemagick', fps=30)
+            if save_flag:
+                os.makedirs(r"./output", exist_ok=True)
+                ani.save(r'./output/dynamic_solution.gif', writer='imagemagick', fps=30)
 
             plt.show()
 

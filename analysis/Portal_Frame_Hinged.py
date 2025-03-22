@@ -1,4 +1,6 @@
 import math
+import os
+
 import matplotlib
 
 import numpy as np
@@ -17,7 +19,7 @@ def portal_frame_staic_test():
 
     # Initialize the beam
     beam_1 = Beam2D(length, E, A, rho, I, num_elements, angle=math.pi / 2)
-    beam_2 = Beam2D(length, E, A, rho, I, num_elements)
+    beam_2 = Beam2D(length, 10 * E, A, rho, I, num_elements)
     beam_3 = Beam2D(length, E, A, rho, I, num_elements, angle=- math.pi / 2)
 
     # Initialize FEM Framework model
@@ -61,7 +63,7 @@ def portal_frame_free_vibration_test(x0):
 
     # Initialize the beam
     beam_1 = Beam2D(length, E, A, rho, I, num_elements, angle=math.pi / 2)
-    beam_2 = Beam2D(length, E, A, rho, I, num_elements)
+    beam_2 = Beam2D(length, 10 * E, A, rho, I, num_elements)
     beam_3 = Beam2D(length, E, A, rho, I, num_elements, angle=- math.pi / 2)
 
     # Initialize FEM Framework model
@@ -88,14 +90,15 @@ def portal_frame_free_vibration_test(x0):
     # assemble the global matrices
     frame_work.assemble_frame_matrices()
 
-    frame_work.solv(tau=0.001, num_steps=1000, x0= x0, dx0=0, sol_type=SolvType.EIGEN)
+    tau = 0.001
+    frame_work.solv(tau=tau, num_steps=1000, x0= x0, dx0=0, sol_type=SolvType.EIGEN)
     eigen_sol = frame_work.dysol.T
 
-    frame_work.solv(tau=0.001, num_steps=1000, x0=x0, dx0=0, sol_type=SolvType.DYNAMIC)
+    frame_work.solv(tau=tau, num_steps=1000, x0=x0, dx0=0, sol_type=SolvType.DYNAMIC)
     fem_sol = frame_work.dysol.T
 
     # Visualization
-    matplotlib.use("WebAgg", force=True)
+    # matplotlib.use("WebAgg", force=True)
     x = [coord[0] for coord in frame_work.coordinates]
     y = [coord[1] for coord in frame_work.coordinates]
 
@@ -147,7 +150,7 @@ def portal_frame_free_vibration_test(x0):
 
     # Create a figure for the dynamic animation
     fig, ax = plt.subplots()
-    line1, = ax.plot([], [], 'r-', label='Dynamic Solution (FEM)')
+    line1, = ax.plot([], [], 'r-', label='Dynamic Solution (Newmark)')
     line2, = ax.plot([], [], 'b-', label='Dynamic Solution (Eigen)')
 
     ax.plot(x, y, 'k-', label='Original Beam')
@@ -168,8 +171,8 @@ def portal_frame_free_vibration_test(x0):
     ani = animation.FuncAnimation(fig, update, frames=fem_sol.shape[1], blit=True)
 
     # Save the animation as a GIF
-    ani.save(r'../output/dynamic_solution_final2.gif', writer='imagemagick', fps=30)
-
+    os.makedirs(r'./output/hinged_framework', exist_ok=True)
+    ani.save(f'./output/hinged_framework/eigen_vs_newmark_Tau={tau}.gif', writer='imagemagick', fps=30)
     # Display the animation
     plt.show()
 

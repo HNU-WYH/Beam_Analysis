@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
@@ -155,10 +157,10 @@ def cantilever_beam(load_type, solv_type = SolvType.STATIC):
         plt.show()
 
     else:
-        for tau in [0.001]:
-            for num_elements in [1, 5, 50]:
+        for tau in [0.0001]:
+            for num_elements in [50]:
                 # # compare with EIgen value method & FEM method
-                matplotlib.use("WebAgg", force=True)
+                # matplotlib.use("WebAgg", force=True)
 
                 # Initialize the beam
                 beam = Beam(length, E, rho, I, num_elements)
@@ -180,29 +182,30 @@ def cantilever_beam(load_type, solv_type = SolvType.STATIC):
                 y0 = temp.stsol[:2 * temp.beam.num_nodes]
 
                 # Solve the dynamic system using FEM method
-                fem.solv(tau=tau, num_steps=1000, x0=y0, dx0=0, sol_type=SolvType.DYNAMIC)
+                fem.solv(tau=tau, num_steps=2000, x0=y0, dx0=0, sol_type=SolvType.DYNAMIC)
                 dysol1 = np.array([fem.assess_dis(fem.dysol[i], x_values) for i in range(fem.dysol.shape[0])])
 
                 # Solve the dynamic system using Eigen method
-                fem.solv(tau=tau, num_steps=1000, x0=y0, dx0=0, sol_type=SolvType.EIGEN)
+                fem.solv(tau=tau, num_steps=2000, x0=y0, dx0=0, sol_type=SolvType.EIGEN)
                 dysol2 = np.array([fem.assess_dis(fem.dysol[i], x_values) for i in range(fem.dysol.shape[0])])
 
                 # Visualization
                 # Create a figure and axis for the animation
-                fig, ax = plt.subplots()
-                line1, = ax.plot([], [], 'r-', label='Dynamic Solution (FEM)')
-                line2, = ax.plot([], [], 'b-', label='Dynamic Solution (Eigen)')
+                fig, ax = plt.subplots(figsize=(10, 6))
+                line1, = ax.plot([], [], 'r-', label='Dynamic Solution (Newmark)')
+                line2, = ax.plot([], [], 'b-', label='Dynamic Solution (Eigenvalue)')
                 ax.set_xlim(0, x_values[-1])
-                ax.set_ylim(min(np.min(dysol1), np.min(dysol2)), max(np.max(dysol1), np.max(dysol2)))
+                ax.set_ylim(1.1 * min(np.min(dysol1), np.min(dysol2)), 1.1 * max(np.max(dysol1), np.max(dysol2)))
                 ax.set_xlabel('Position along the beam (x) [m]')
                 ax.set_ylabel('Displacement [mm]')
-                ax.set_title(f'Comparison of FEM and Eigen Solutions Over Time\nTau={tau}, Num Elements={num_elements}')
                 ax.legend(loc="upper left")
+                ax.grid(True)
 
                 # Update function for animation
                 def update(frame):
                     line1.set_data(x_values, dysol1[frame, :])
                     line2.set_data(x_values, dysol2[frame, :])
+                    ax.set_title(f'Free Vibration Over Time (Step: {frame})')
                     return line1, line2
 
                 # Create animation
@@ -210,13 +213,14 @@ def cantilever_beam(load_type, solv_type = SolvType.STATIC):
                                               repeat=False)
 
                 # save animation
-                ani.save(f'..\output\eigen_vs_fem_Tau={tau}_NumEle={num_elements}.gif', writer='imagemagick', fps=30)
+                os.makedirs(r'./output/cantilever', exist_ok=True)
+                ani.save(f'./output/cantilever/eigen_vs_newmark_Tau={tau}_NumEle={num_elements}.gif', writer='imagemagick', fps=30)
 
                 # Display the animation
-                plt.show()
+                plt.close()
 
 if __name__ == "__main__":
     # Run the test
-    cantilever_beam(LoadType.F)
-    cantilever_beam(LoadType.q)
+    # cantilever_beam(LoadType.F)
+    # cantilever_beam(LoadType.q)
     cantilever_beam(None, SolvType.DYNAMIC)
